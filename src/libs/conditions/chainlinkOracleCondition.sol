@@ -5,10 +5,11 @@ import "chainlink/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import "./BaseCondition.sol";
 
 contract ChainLinkOracleCondition is BaseCondition {
-    AggregatorV3Interface internal priceFeed;
-    int256 private conditionPrice;
     enum Condition {GREATER, EQUAL, LESS}
-    Condition private condition;
+
+    AggregatorV3Interface internal immutable priceFeed;
+    int256 private immutable conditionPrice;
+    Condition private immutable condition;
 
     constructor(address _oracleAddress, int256 _conditionPrice, Condition _condition) {
         priceFeed = AggregatorV3Interface(_oracleAddress);
@@ -31,9 +32,6 @@ contract ChainLinkOracleCondition is BaseCondition {
             return price == conditionPrice;
         } else if (condition == Condition.LESS) {
             return price < conditionPrice;
-        }
-
-        // Default to false in case of unexpected condition value
-        return false;
+        } else return false; // Default to false in case of unexpected condition value
     }
 }
