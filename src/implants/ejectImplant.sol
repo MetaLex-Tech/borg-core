@@ -1,16 +1,15 @@
-
-
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
 import "../interfaces/ISafe.sol";
 import "../libs/auth.sol";
+import "../libs/conditions/conditionManager.sol";
 
-contract ejectImplant is GlobalACL { //is baseImplant
+contract ejectImplant is GlobalACL, ConditionManager { //is baseImplant
 
     address public immutable BORG_SAFE;
 
-    constructor(Auth _auth, address _borgSafe) GlobalACL(_auth) {
+    constructor(Auth _auth, address _borgSafe) ConditionManager(_auth) {
         BORG_SAFE = _borgSafe;
     }
 
@@ -18,7 +17,7 @@ contract ejectImplant is GlobalACL { //is baseImplant
         // require(msg.sender == authorizedCaller, "Caller is not authorized");
         ISafe gnosisSafe = ISafe(BORG_SAFE);
         require(gnosisSafe.isOwner(owner), "Address is not an owner");
-
+        require(checkConditions(), "Conditions not met");
         address[] memory owners = gnosisSafe.getOwners();
         address prevOwner = address(0x1);
         for (uint256 i = owners.length-1; i>=0; i--) {

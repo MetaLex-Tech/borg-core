@@ -9,7 +9,7 @@ contract borgCore is BaseGuard, GlobalACL {
 
 
     /// Error Messages
-    error BORG_CORE_InvalidRecepient();
+    error BORG_CORE_InvalidRecipient();
     error BORG_CORE_InvalidContract();
     error BORG_CORE_AmountOverLimit();
 
@@ -17,7 +17,7 @@ contract borgCore is BaseGuard, GlobalACL {
     /// @dev We can add more properties to the structs to add more functionality  
     /// Future ideas: method limitation of functions, scope, delegate caller
     /// mapping(bytes4 => bool) functionWhitelist;
-    struct Recepient {
+    struct Recipient {
         bool approved;
         uint256 transactionLimit;
     }
@@ -34,7 +34,7 @@ contract borgCore is BaseGuard, GlobalACL {
     bytes4 private constant TRANSFER_FROM_METHOD_ID = 0x23b872dd;
 
     /// Whitelist Mappings
-    mapping(address => Recepient) public whitelistedRecepients;
+    mapping(address => Recipient) public whitelistedRecipients;
     mapping(address => Contract) public whitelistedContracts;
 
     /// Constructor
@@ -64,10 +64,10 @@ contract borgCore is BaseGuard, GlobalACL {
     {
         if (value > 0 && data.length == 0) {
             // Native Gas transfer
-            if(!whitelistedRecepients[to].approved) {
-                revert BORG_CORE_InvalidRecepient();
+            if(!whitelistedRecipients[to].approved) {
+                revert BORG_CORE_InvalidRecipient();
             }
-            if(value > whitelistedRecepients[to].transactionLimit) {
+            if(value > whitelistedRecipients[to].transactionLimit) {
                 revert BORG_CORE_AmountOverLimit();
             }
          } else if (data.length >= 4 && whitelistedContracts[to].approved) {
@@ -80,10 +80,10 @@ contract borgCore is BaseGuard, GlobalACL {
                 address destination = abi.decode(data[4:36], (address));
                 // Pull the tx amount from the call data
                 uint256 amount = abi.decode(data[36:68], (uint256));
-                if(!whitelistedRecepients[destination].approved) {
-                   revert BORG_CORE_InvalidRecepient();
+                if(!whitelistedRecipients[destination].approved) {
+                   revert BORG_CORE_InvalidRecipient();
                 }
-                if((amount > whitelistedRecepients[destination].transactionLimit) || (amount > whitelistedContracts[to].transactionLimit)) {
+                if((amount > whitelistedRecipients[destination].transactionLimit) || (amount > whitelistedContracts[to].transactionLimit)) {
                  revert BORG_CORE_AmountOverLimit();
                 }
             }
@@ -98,14 +98,14 @@ contract borgCore is BaseGuard, GlobalACL {
      
     }
 
-    // @dev add recepient address and transaction limit to the whitelist
-    function addRecepient(address _recepient, uint256 _transactionLimit) external onlyOwner {
-        whitelistedRecepients[_recepient] = Recepient(true, _transactionLimit);
+    // @dev add recipient address and transaction limit to the whitelist
+    function addRecipient(address _recipient, uint256 _transactionLimit) external onlyOwner {
+        whitelistedRecipients[_recipient] = Recipient(true, _transactionLimit);
     }
 
-    // @dev remove recepient address from the whitelist
-    function removeRecepient(address _recepient) external onlyOwner {
-        whitelistedRecepients[_recepient] = Recepient(false, 0);
+    // @dev remove recipient address from the whitelist
+    function removeRecipient(address _recipient) external onlyOwner {
+        whitelistedRecipients[_recipient] = Recipient(false, 0);
     }
 
     // @dev add contract address and transaction limit to the whitelist

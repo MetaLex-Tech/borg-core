@@ -4,9 +4,11 @@ import "forge-std/Test.sol";
 import "../src/borgCore.sol";
 import "../src/implants/ejectImplant.sol";
 import "solady/tokens/ERC20.sol";
-import "../src/libs/auth.sol";
 import "../src/implants/optimisticGrantImplant.sol";
 import "../src/implants/daoVetoGrantImplant.sol";
+import "./libraries/safe.t.sol";
+import "../src/libs/conditions/signatureCondition.sol";
+
 
 contract ProjectTest is Test {
   // global contract deploys for the tests
@@ -16,6 +18,7 @@ contract ProjectTest is Test {
   Auth auth;
   optimisticGrantImplant opGrant;
   daoVetoGrantImplant vetoGrant;
+  SignatureCondition sigCondition;
 
   IMultiSendCallOnly multiSendCallOnly =
     IMultiSendCallOnly(0xd34C0841a14Cd53428930D4E0b76ea2406603B00); //make sure this matches your chain
@@ -58,6 +61,13 @@ contract ProjectTest is Test {
     eject = new ejectImplant(auth, MULTISIG);
     opGrant = new optimisticGrantImplant(auth, MULTISIG);
     vetoGrant = new daoVetoGrantImplant(auth, MULTISIG, arb_addr, 259200, 1);
+    //create SignatureCondition.Logic for and
+     SignatureCondition.Logic logic = SignatureCondition.Logic.AND;
+    address[] memory signers = new address[](1); // Declare a dynamically-sized array with 1 element
+    signers[0] = address(owner);
+    sigCondition = new SignatureCondition(signers, 1, logic);
+    vm.prank(dao);
+    eject.addCondition(ConditionManager.Logic.AND, address(sigCondition));
 
     //for test: give out some tokens
     deal(owner, 2 ether);
@@ -541,52 +551,4 @@ contract ProjectTest is Test {
             signature
         );
     }
-}
-
-interface IGnosisSafe {
-    function getThreshold() external view returns (uint256);
-
-    function isOwner(address owner) external view returns (bool);
-
-    function getOwners() external view returns (address[] memory);
-
-    function setGuard(address guard) external;
-
-    function execTransaction(
-        address to,
-        uint256 value,
-        bytes memory data,
-        uint8 operation,
-        uint256 safeTxGas,
-        uint256 baseGas,
-        uint256 gasPrice,
-        address gasToken,
-        address refundReceiver,
-        bytes memory signatures
-    ) external payable returns (bool success);
-
-    function encodeTransactionData(
-        address to,
-        uint256 value,
-        bytes memory data,
-        uint8 operation,
-        uint256 safeTxGas,
-        uint256 baseGas,
-        uint256 gasPrice,
-        address gasToken,
-        address refundReceiver,
-        uint256 _nonce
-    ) external view returns (bytes memory);
-
-    function nonce() external view returns (uint256);
-}
-
-struct GnosisTransaction {
-    address to;
-    uint256 value;
-    bytes data;
-}
-
-interface IMultiSendCallOnly {
-    function multiSend(bytes memory transactions) external payable;
 }

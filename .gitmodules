@@ -7,3 +7,6 @@
 [submodule "lib/safe-contracts"]
 	path = lib/safe-contracts
 	url = https://github.com/gnosis/safe-contracts
+[submodule "lib/chainlink"]
+	path = lib/chainlink
+	url = https://github.com/smartcontractkit/chainlink

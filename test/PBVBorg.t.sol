@@ -7,6 +7,7 @@ import "solady/tokens/ERC20.sol";
 import "../src/libs/auth.sol";
 import "../src/implants/optimisticGrantImplant.sol";
 import "../src/implants/daoVetoGrantImplant.sol";
+import "./libraries/safe.t.sol";
 
 contract ProjectTest is Test {
   // global contract deploys for the tests
@@ -20,12 +21,12 @@ contract ProjectTest is Test {
   IMultiSendCallOnly multiSendCallOnly =
     IMultiSendCallOnly(0xd34C0841a14Cd53428930D4E0b76ea2406603B00); //make sure this matches your chain
 
-  // Set&pull our addresses for the tests. This is set for forked ZKSYNC ERA
-  address MULTISIG = 0x68042dCD9a6178C97D518858829A3796639344F2; //change this to the deployed Safe address
+  // Set&pull our addresses for the tests. This is set for forked Arbitrum mainnet
+  address MULTISIG = 0x201308B728ACb48413CD27EC60B4FfaC074c2D01; //change this to the deployed Safe address
   address owner = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266; //owner of the safe protaganist
   address jr = 0xe31e00cb74deF9194D95F70ca938403064480A2f; //"junior" antagonist
   address vip = 0xC2ab7443999c32498e7B0295335025e549515025; //vip address that has a lot of voting power in the test governance token
-  address usdc_addr = 0x3355df6D4c9C3035724Fd0e3914dE96A5a83aaf4; //make sure this matches your chain
+  address usdc_addr = 0xaf88d065e77c8cC2239327C5EDb3A432268e5831; //make sure this matches your chain
   address dai_addr = 0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1; //make sure this matches your chain
   address arb_addr = 0x912CE59144191C1204E64559FE8253a0e49E6548; //arb token
 
@@ -34,7 +35,8 @@ contract ProjectTest is Test {
 
   // Adding some tokens for the test
   ERC20 usdc;// = ERC20(usdc_addr);
-
+  ERC20 dai;// = ERC20(dai_addr);
+  ERC20 arb;// = ERC20(arb);
 
   /// Set our initial state: (All other tests are in isolation but share this state)
   /// 1. Set up the safe
@@ -43,43 +45,44 @@ contract ProjectTest is Test {
   /// 4. Inject the implants into the safe
   /// 5. Set balances for tests
   function setUp() public {
-    //ERC20 usdc = ERC20(usdc_addr);
+    ERC20 usdc = ERC20(usdc_addr);
+    ERC20 dai = ERC20(dai_addr);
+    ERC20 arb = ERC20(arb_addr);
     deal(dao, 2 ether);
     
     
-    vm.startPrank(dao);
+    vm.prank(dao);
     auth = new Auth();
-    vm.stopPrank();
-    
+
     safe = IGnosisSafe(MULTISIG);
     core = new borgCore(auth);
     eject = new ejectImplant(auth, MULTISIG);
     opGrant = new optimisticGrantImplant(auth, MULTISIG);
-    vetoGrant = new daoVetoGrantImplant(auth, MULTISIG, usdc_addr, 259200, 1);
+    vetoGrant = new daoVetoGrantImplant(auth, MULTISIG, arb_addr, 259200, 1);
 
     //for test: give out some tokens
     deal(owner, 2 ether);
     deal(MULTISIG, 2 ether);
-    //deal(address(usdc), vip, 1000000000 ether);
+    deal(address(arb), vip, 1000000000 ether);
 
     //sigers add jr, add the eject, optimistic grant, and veto grant implants.
     executeSingle(addOwner(address(jr)));
-    /*executeSingle(getAddModule(address(eject)));
+    executeSingle(getAddModule(address(eject)));
     executeSingle(getAddModule(address(opGrant)));
     executeSingle(getAddModule(address(vetoGrant)));
 
     //dao deploys the core, with the dao as the owner.
-    vm.startPrank(dao);
+    vm.prank(dao);
     core.addContract(address(core), 2 ether);
-    vm.stopPrank();
+
 
     //Set the core as the guard for the safe
-    executeSingle(getSetGuardData(address(MULTISIG)));*/
+    executeSingle(getSetGuardData(address(MULTISIG)));
 
     //for test: give some tokens out
     deal(owner, 2 ether);
     deal(MULTISIG, 2 ether);
-    //deal(address(usdc), vip, 1000000000 ether);
+    deal(address(dai), MULTISIG, 2 ether);
  
   }
 
@@ -92,126 +95,125 @@ contract ProjectTest is Test {
 
   function testOpGrant() public {
 
-    vm.startPrank(dao);
+    vm.prank(dao);
     opGrant.addApprovedGrantToken(dai_addr, 2 ether);
+
+    vm.prank(dao);
     opGrant.setGrantLimits(1, 1711930764); // 1 grant by march 31, 2024
+
+    vm.prank(dao);
     opGrant.toggleAllowOwners(true); 
-    vm.stopPrank();
-    vm.startPrank(owner);
+
+    vm.prank(owner);
     opGrant.createGrant(dai_addr, address(jr), 2 ether);
-    vm.stopPrank();
+
     //executeSingle(getCreateGrant(address(dai), address(jr), 2 ether));
   }
 
   function testOpGrantBORG() public {
 
-   vm.startPrank(dao);
+    vm.prank(dao);
     core.addContract(address(opGrant), 2 ether);
 
+    vm.prank(dao);
     opGrant.addApprovedGrantToken(dai_addr, 2 ether);
 
+    vm.prank(dao);
     opGrant.setGrantLimits(1, 1711930764); // 1 grant by march 31, 2024
-    vm.stopPrank();
 
     executeSingle(getCreateGrant(dai_addr, address(jr), 2 ether));
   }
 
   function testFailtOpGrantTooMany() public {
 
-    vm.startPrank(dao);
+    vm.prank(dao);
     opGrant.addApprovedGrantToken(dai_addr, 2 ether);
 
-
+    vm.prank(dao);
     opGrant.setGrantLimits(1, 1711930764); // 1 grant by march 31, 2024
-    vm.stopPrank();
-    vm.startPrank(owner);
+
+    vm.prank(owner);
     opGrant.createGrant(dai_addr, address(jr), 2 ether);
 
-
+    vm.prank(owner);
     opGrant.createGrant(dai_addr, address(jr), 2 ether);
-    vm.stopPrank();
+
     //executeSingle(getCreateGrant(address(dai), address(jr), 2 ether));
   }
 
   function testFailtOpGrantTooMuch() public {
 
-    vm.startPrank(dao);
+    vm.prank(dao);
     opGrant.addApprovedGrantToken(dai_addr, 2 ether);
 
-
+    vm.prank(dao);
     opGrant.setGrantLimits(5, 1711930764); // 1 grant by march 31, 2024
-    vm.stopPrank();
-    vm.startPrank(owner);
+
+    vm.prank(owner);
     opGrant.createGrant(dai_addr, address(jr), 3 ether);
-    vm.stopPrank();
+
   }
 
   function testFailtOpGrantWrongToken() public {
 
-     vm.startPrank(dao);
+    vm.prank(dao);
     opGrant.addApprovedGrantToken(dai_addr, 2 ether);
 
-    
+    vm.prank(dao);
     opGrant.setGrantLimits(6, 1711930764); // 1 grant by march 31, 2024
-    vm.stopPrank();
-    vm.startPrank(owner);
+
+    vm.prank(owner);
     opGrant.createGrant(usdc_addr, address(jr), 1 ether);
-    vm.stopPrank();
+
   }
 
     function testVetoGrant() public {
 
-    vm.startPrank(dao);
+    vm.prank(dao);
     vetoGrant.addApprovedGrantToken(dai_addr, 2 ether);
-    vm.stopPrank();
-    vm.startPrank(owner);
+
+    vm.prank(owner);
     uint256 id = vetoGrant.createProposal(dai_addr, address(jr), 2 ether);
     skip(259205);
 
+    vm.prank(owner);
     vetoGrant.executeProposal(id);
     //assertion
-    vm.stopPrank();
   }
 
   function testFailVetoGrantVeto() public {
 
-    vm.startPrank(dao);
+    vm.prank(dao);
     vetoGrant.addApprovedGrantToken(dai_addr, 2 ether);
-vm.stopPrank();
-    vm.startPrank(owner);
+
+    vm.prank(owner);
     uint256 id = vetoGrant.createProposal(dai_addr, address(jr), 2 ether);
     skip(100);
-    vm.stopPrank();
 
-    vm.startPrank(vip);
+    vm.prank(vip);
     vetoGrant.objectToProposal(id);
     skip(259205);
-    vm.stopPrank();
 
-    vm.startPrank(owner);
+    vm.prank(owner);
     vetoGrant.executeProposal(id);
-    vm.stopPrank();
 
     }
 
    function testDAOEject() public {
-    vm.startPrank(dao);
-    eject.ejectOwner(address(owner));
-    vm.stopPrank();
-    assertEq(safe.isOwner(address(owner)), false);
+    vm.prank(dao);
+    eject.ejectOwner(address(jr));
+    assertEq(safe.isOwner(address(jr)), false);
   }
 
   function testSelfEject() public {
-    vm.startPrank(jr);
+    vm.prank(jr);
     eject.selfEject();
-    vm.stopPrank();
     assertEq(safe.isOwner(address(jr)), false);
   }
 
     function testFailejectNotApproved() public {
-    vm.startPrank(jr);
+    vm.prank(jr);
     eject.ejectOwner(jr);
-    vm.stopPrank();
     assertEq(safe.isOwner(address(jr)), true);
   }
 
@@ -420,11 +422,8 @@ vm.stopPrank();
             nonce
         );
 
-   
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
-   
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(deployerPrivateKey, keccak256(txHashData));
-    
         bytes memory signature = abi.encodePacked(r, s, v);
         return signature;
     }
@@ -477,7 +476,6 @@ vm.stopPrank();
         address gasToken = address(0);
         address refundReceiver = address(0);
         uint256 nonce = safe.nonce();
-        vm.startPrank(owner);
         bytes memory signature = getSignature(
             to,
             value,
@@ -490,7 +488,7 @@ vm.stopPrank();
             refundReceiver,
             nonce
         );
-     
+        vm.prank(owner);
         safe.execTransaction(
             to,
             value,
@@ -503,7 +501,6 @@ vm.stopPrank();
             refundReceiver,
             signature
         );
-        vm.stopPrank();
     }
 
     function executeData(
@@ -519,7 +516,6 @@ vm.stopPrank();
         address gasToken = address(0);
         address refundReceiver = address(0);
         uint256 nonce = safe.nonce();
-                vm.startPrank(owner);
         bytes memory signature = getSignature(
             to,
             value,
@@ -532,7 +528,7 @@ vm.stopPrank();
             refundReceiver,
             nonce
         );
-
+        vm.prank(owner);
         safe.execTransaction(
             to,
             value,
@@ -545,54 +541,5 @@ vm.stopPrank();
             refundReceiver,
             signature
         );
-        vm.stopPrank();
     }
-}
-
-interface IGnosisSafe {
-    function getThreshold() external view returns (uint256);
-
-    function isOwner(address owner) external view returns (bool);
-
-    function getOwners() external view returns (address[] memory);
-
-    function setGuard(address guard) external;
-
-    function execTransaction(
-        address to,
-        uint256 value,
-        bytes memory data,
-        uint8 operation,
-        uint256 safeTxGas,
-        uint256 baseGas,
-        uint256 gasPrice,
-        address gasToken,
-        address refundReceiver,
-        bytes memory signatures
-    ) external payable returns (bool success);
-
-    function encodeTransactionData(
-        address to,
-        uint256 value,
-        bytes memory data,
-        uint8 operation,
-        uint256 safeTxGas,
-        uint256 baseGas,
-        uint256 gasPrice,
-        address gasToken,
-        address refundReceiver,
-        uint256 _nonce
-    ) external view returns (bytes memory);
-
-    function nonce() external view returns (uint256);
-}
-
-struct GnosisTransaction {
-    address to;
-    uint256 value;
-    bytes data;
-}
-
-interface IMultiSendCallOnly {
-    function multiSend(bytes memory transactions) external payable;
 }

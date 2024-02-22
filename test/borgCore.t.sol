@@ -5,6 +5,7 @@ import "../src/borgCore.sol";
 import "../src/implants/ejectImplant.sol";
 import "solady/tokens/ERC20.sol";
 import "../src/libs/auth.sol";
+import "./libraries/safe.t.sol";
 
 contract ProjectTest is Test {
   // global contract deploys for the tests
@@ -98,7 +99,7 @@ contract ProjectTest is Test {
     vm.prank(dao);
     core.addContract(address(dai), .01 ether);
     vm.prank(dao);
-    core.addRecepient(owner, .01 ether);
+    core.addRecipient(owner, .01 ether);
     executeSingle(getTransferData(address(dai), owner, .01 ether));
   }
 
@@ -109,7 +110,7 @@ contract ProjectTest is Test {
     core.addContract(address(dai), .01 ether);
 
     vm.prank(dao);
-    core.addRecepient(owner, .01 ether);
+    core.addRecipient(owner, .01 ether);
     executeSingle(getTransferData(address(dai), owner, .1 ether));
   }
 
@@ -119,7 +120,7 @@ contract ProjectTest is Test {
     vm.prank(dao);
     core.addContract(dai_addr, .01 ether);
     vm.prank(dao);
-    core.addRecepient(owner, .01 ether);
+    core.addRecipient(owner, .01 ether);
     executeSingle(getTransferData(dai_addr, owner, .01 ether));
     executeSingle(getTransferData(usdc_addr, owner, .01 ether));
   }
@@ -131,7 +132,7 @@ contract ProjectTest is Test {
     core.addContract(usdc_addr, .01 ether);
 
     vm.prank(dao);
-    core.addRecepient(owner, 1 ether);
+    core.addRecipient(owner, 1 ether);
     executeSingle(getTransferData(usdc_addr, owner, 1 ether));
   }
 
@@ -144,7 +145,7 @@ contract ProjectTest is Test {
   /// @dev A native gas token transfer over the limit should fail.
   function testFailOnNativeOverpayment() public {
     executeSingle(getSetGuardData(address(MULTISIG)));
-    executeSingle(getAddRecepientGuardData(address(core), owner, .1 ether));
+    executeSingle(getaddRecipientGuardData(address(core), owner, .1 ether));
     executeSingle(getNativeTransferData(owner, 2 ether), 2 ether);
   }
 
@@ -152,7 +153,7 @@ contract ProjectTest is Test {
   function testPassOnNativeDevPayment() public {
     executeSingle(getSetGuardData(address(MULTISIG)));
     vm.prank(dao);
-    core.addRecepient(owner, .01 ether);
+    core.addRecipient(owner, .01 ether);
     executeSingle(getNativeTransferData(owner, .01 ether), .01 ether);
   }
 
@@ -160,7 +161,7 @@ contract ProjectTest is Test {
   function testFailOnAddThenRemoveDaiContract() public {
     executeSingle(getSetGuardData(address(MULTISIG)));
     core.addContract(address(dai), .01 ether);
-    executeSingle(getAddRecepientGuardData(address(core), owner, .01 ether));
+    executeSingle(getaddRecipientGuardData(address(core), owner, .01 ether));
     executeSingle(getTransferData(address(dai), owner, .01 ether));
     executeSingle(getRemoveContractGuardData(address(core), address(dai)));
     executeSingle(getTransferData(address(dai), owner, .01 ether));
@@ -169,7 +170,7 @@ contract ProjectTest is Test {
   function testFailOnAddThenRemoveRecepient() public {
     executeSingle(getSetGuardData(address(MULTISIG)));
     executeSingle(getAddContractGuardData(address(core), address(dai), .01 ether));
-    executeSingle(getAddRecepientGuardData(address(core), owner, .01 ether));
+    executeSingle(getaddRecipientGuardData(address(core), owner, .01 ether));
     executeSingle(getTransferData(address(dai), owner, .01 ether));
     executeSingle(getRemoveRecepientGuardData(address(core), owner));
     executeSingle(getTransferData(address(dai), owner, .01 ether));
@@ -301,13 +302,13 @@ contract ProjectTest is Test {
         return txData;
     }
 
-    function getAddRecepientGuardData(address to, address allow, uint256 amount) public view returns (GnosisTransaction memory) {
-        bytes4 addRecepientMethod = bytes4(
-            keccak256("addRecepient(address,uint256)")
+    function getaddRecipientGuardData(address to, address allow, uint256 amount) public view returns (GnosisTransaction memory) {
+        bytes4 addRecipientMethod = bytes4(
+            keccak256("addRecipient(address,uint256)")
         );
 
         bytes memory recData = abi.encodeWithSelector(
-            addRecepientMethod,
+            addRecipientMethod,
             address(allow),
             amount
         );
@@ -486,52 +487,4 @@ contract ProjectTest is Test {
             signature
         );
     }
-}
-
-interface IGnosisSafe {
-    function getThreshold() external view returns (uint256);
-
-    function isOwner(address owner) external view returns (bool);
-
-    function getOwners() external view returns (address[] memory);
-
-    function setGuard(address guard) external;
-
-    function execTransaction(
-        address to,
-        uint256 value,
-        bytes memory data,
-        uint8 operation,
-        uint256 safeTxGas,
-        uint256 baseGas,
-        uint256 gasPrice,
-        address gasToken,
-        address refundReceiver,
-        bytes memory signatures
-    ) external payable returns (bool success);
-
-    function encodeTransactionData(
-        address to,
-        uint256 value,
-        bytes memory data,
-        uint8 operation,
-        uint256 safeTxGas,
-        uint256 baseGas,
-        uint256 gasPrice,
-        address gasToken,
-        address refundReceiver,
-        uint256 _nonce
-    ) external view returns (bytes memory);
-
-    function nonce() external view returns (uint256);
-}
-
-struct GnosisTransaction {
-    address to;
-    uint256 value;
-    bytes data;
-}
-
-interface IMultiSendCallOnly {
-    function multiSend(bytes memory transactions) external payable;
 }

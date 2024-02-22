@@ -3,7 +3,7 @@ pragma solidity ^0.8.19;
 
 bytes32 constant OWNER_ROLE = keccak256("OWNER");
 bytes32 constant ADMIN_ROLE = keccak256("ADMIN");
-bytes32 constant PRIVLEDGED_ROLE = keccak256("PRIVLEDGED");
+bytes32 constant PRIVILEGED_ROLE = keccak256("PRIVILEGED");
 
 
 /// @title Auth
