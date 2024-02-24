@@ -12,8 +12,8 @@ contract SignatureCondition is BaseCondition {
 
     Logic public immutable logic;
     uint256 private immutable threshold;
-    uint256 private immutable numSigners;
-    uint256 public signatureCount;
+    uint8 private immutable numSigners;
+    uint8 public signatureCount;
 
     mapping(address => bool) public hasSigned;
     mapping(address => bool) public isSigner;
@@ -34,13 +34,15 @@ contract SignatureCondition is BaseCondition {
             revert SignatureCondition_ThresholdExceedsSigners();
         threshold = _threshold;
         logic = _logic;
+        uint8 signerCount = 0;
         for (uint256 i = 0; i < _signers.length; ) {
-            isSigner[_signers[i]] == true;
+            isSigner[_signers[i]] = true;
             unchecked {
                 i++; // will not overflow without hitting gas limit
-                numSigners++;
+                signerCount++;
             }
         }
+        numSigners = signerCount;
     }
 
     function sign() public {
