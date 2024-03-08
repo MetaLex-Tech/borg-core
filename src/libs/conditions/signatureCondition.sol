@@ -12,8 +12,8 @@ contract SignatureCondition is BaseCondition {
 
     Logic public immutable logic;
     uint256 private immutable threshold;
-    uint8 private immutable numSigners;
-    uint8 public signatureCount;
+    uint256 private immutable numSigners;
+    uint256 public signatureCount;
 
     mapping(address => bool) public hasSigned;
     mapping(address => bool) public isSigner;

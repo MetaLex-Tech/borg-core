@@ -209,6 +209,8 @@ contract ProjectTest is Test {
     }
 
    function testDAOEject() public {
+    vm.prank(owner);
+    sigCondition.sign();
     vm.prank(dao);
     eject.ejectOwner(address(jr));
     assertEq(safe.isOwner(address(jr)), false);

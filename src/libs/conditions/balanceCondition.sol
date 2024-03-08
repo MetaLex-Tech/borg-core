@@ -3,13 +3,13 @@ pragma solidity ^0.8.19;
 import "./BaseCondition.sol";
 import "forge-std/interfaces/IERC20.sol";
 
-contract SignatureCondition is BaseCondition {
+contract BalanceCondition is BaseCondition {
 
     address public immutable token;
     address public immutable target;
     uint256 public immutable amount;
     enum Comparison {GREATER, EQUAL, LESS}
-    Comparison private comparison;
+    Comparison private immutable comparison;
 
     /// @param _token address of the ERC20 token to check the balance of
     /// @param _target address of the target address to check the balance of

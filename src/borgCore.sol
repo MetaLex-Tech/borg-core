@@ -97,8 +97,9 @@ contract borgCore is BaseGuard, GlobalACL {
             if(value > whitelistedRecipients[to].transactionLimit) {
                 revert BORG_CORE_AmountOverLimit();
             }
-         } else if (data.length >= 4 && whitelistedContracts[to].approved) {
-            isMethodCallAllowed(to, data);
+         } else if (data.length >= 4) {
+            if(isMethodCallAllowed(to, data))
+               return;
             bytes4 methodId = bytes4(data[:4]);
             // Check for an ERC20 transfer
             if (methodId == TRANSFER_METHOD_ID || methodId == TRANSFER_FROM_METHOD_ID) {
@@ -153,7 +154,7 @@ contract borgCore is BaseGuard, GlobalACL {
     }
 
         // Function to add a parameter constraint for uint256 with range
-    function addUintParameterConstraint(
+    function addRangeParameterConstraint(
         address _contract,
         string memory _methodSignature,
         uint8 _paramIndex,
@@ -192,6 +193,7 @@ contract borgCore is BaseGuard, GlobalACL {
         uint256 _byteLength
     ) internal {
         bytes4 methodSelector = bytes4(keccak256(bytes(_methodSignature)));
+
         whitelist[_contract].methods[methodSelector].parameterConstraints[_paramIndex] = ParamConstraint({
             exists: true,
             paramType: _paramType,
@@ -201,6 +203,8 @@ contract borgCore is BaseGuard, GlobalACL {
             byteOffset: _byteOffset,
             byteLength: _byteLength
         });
+         //set method allowed to true
+        whitelist[_contract].methods[methodSelector].allowed = true;
         //update the currentConstraints counter
         whitelist[_contract].methods[methodSelector].currentConstraints++;
     }
@@ -214,6 +218,7 @@ contract borgCore is BaseGuard, GlobalACL {
         //remove the parameter constraint, not set it to false
         delete whitelist[_contract].methods[methodSelector].parameterConstraints[_paramIndex];
         //update the currentConstraints counter
+       
         whitelist[_contract].methods[methodSelector].currentConstraints--;
     }
 
@@ -232,35 +237,36 @@ contract borgCore is BaseGuard, GlobalACL {
         // Iterate through the whitelist constraints for the method
         for (uint8 i = 0; i < methodConstraint.currentConstraints; i++) { // Placeholder for actual parameter count management
             ParamConstraint storage param = methodConstraint.parameterConstraints[i];
+
             if (param.exists) {
                 if (param.paramType == ParamType.UINT) {
+
                     // Extracting a uint256 value
-                    uint256 paramValue = abi.decode(_methodCallData[param.byteOffset:param.byteLength], (uint256));
+                    uint256 paramValue = abi.decode(_methodCallData[param.byteOffset:param.byteOffset+param.byteLength], (uint256));
                     if (paramValue < param.minValue || paramValue > param.maxValue) {
                         return false;
                     }
                 } else if (param.paramType == ParamType.ADDRESS) {
                     // Extracting an address value
-                    address addrValue = abi.decode(_methodCallData[param.byteOffset:param.byteLength], (address));
+                    address addrValue = abi.decode(_methodCallData[param.byteOffset:param.byteOffset+param.byteLength], (address));
                     if (keccak256(abi.encodePacked(addrValue)) != keccak256(param.exactMatch)) {
                         return false;
                     }
                 }
                 else if (param.paramType == ParamType.STRING) {
-                    // Extracting an address value
-                    string memory addrValue = abi.decode(_methodCallData[param.byteOffset:param.byteLength], (string));
+                    // Extracting a string value
+                    string memory addrValue = abi.decode(_methodCallData[param.byteOffset:param.byteOffset+param.byteLength], (string));
                     if (keccak256(abi.encodePacked(addrValue)) != keccak256(param.exactMatch)) {
                         return false;
                     }
                 }
                 else if (param.paramType == ParamType.BYTES) {
-                    // Extracting an address value
-                    bytes memory addrValue = abi.decode(_methodCallData[param.byteOffset:param.byteLength], (bytes));
+                    // Extracting bytes
+                    bytes memory addrValue = abi.decode(_methodCallData[param.byteOffset:param.byteOffset+param.byteLength], (bytes));
                     if (keccak256(abi.encodePacked(addrValue)) != keccak256(param.exactMatch)) {
                         return false;
                     }
                 }
-
             }
         }
 

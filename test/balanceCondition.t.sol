@@ -4,8 +4,14 @@ import "forge-std/Test.sol";
 import "../src/borgCore.sol";
 import "../src/implants/ejectImplant.sol";
 import "solady/tokens/ERC20.sol";
-import "../src/libs/auth.sol";
+import "../src/implants/optimisticGrantImplant.sol";
+import "../src/implants/daoVetoGrantImplant.sol";
 import "./libraries/safe.t.sol";
+import "../src/libs/conditions/balanceCondition.sol";
+import "../src/libs/conditions/signatureCondition.sol";
+import "forge-std/mocks/MockERC20.sol";
+import  "forge-std/StdCheats.sol";
+
 
 contract ProjectTest is Test {
   // global contract deploys for the tests
@@ -13,186 +19,283 @@ contract ProjectTest is Test {
   borgCore core;
   ejectImplant eject;
   Auth auth;
+  optimisticGrantImplant opGrant;
+  daoVetoGrantImplant vetoGrant;
+  SignatureCondition sigCondition;
+  address target;
+  BalanceCondition conditionGreater;
+  BalanceCondition conditionEqual;
+  BalanceCondition conditionLess;
+  uint256 amount;
+
 
   IMultiSendCallOnly multiSendCallOnly =
     IMultiSendCallOnly(0xd34C0841a14Cd53428930D4E0b76ea2406603B00); //make sure this matches your chain
 
   // Set&pull our addresses for the tests. This is set for forked Arbitrum mainnet
   address MULTISIG = 0x201308B728ACb48413CD27EC60B4FfaC074c2D01; //change this to the deployed Safe address
-  address owner = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266; //change this to the owner of the Safe (needs matching pk in the .env)
-  address jr = 0xe31e00cb74deF9194D95F70ca938403064480A2f;
+  address owner = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266; //owner of the safe protaganist
+  address jr = 0xe31e00cb74deF9194D95F70ca938403064480A2f; //"junior" antagonist
+  address vip = 0xC2ab7443999c32498e7B0295335025e549515025; //vip address that has a lot of voting power in the test governance token
   address usdc_addr = 0xaf88d065e77c8cC2239327C5EDb3A432268e5831; //make sure this matches your chain
   address dai_addr = 0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1; //make sure this matches your chain
+  address arb_addr = 0x912CE59144191C1204E64559FE8253a0e49E6548; //arb token
+  address burn = 0x000000000000000000000000000000000000dEaD; //burn address
+  address weth_addr = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1;
+
+ // represents the DAO's On chain power address
   address dao = address(0xDA0);
 
   // Adding some tokens for the test
   ERC20 usdc;// = ERC20(usdc_addr);
   ERC20 dai;// = ERC20(dai_addr);
+  ERC20 arb;// = ERC20(arb);
+  ERC20 weth;
+  MockERC20 token;
 
   /// Set our initial state: (All other tests are in isolation but share this state)
   /// 1. Set up the safe
   /// 2. Set up the core with the safe as the owner
   /// 3. Allow the safe as a contract on the core
-  /// 4. Set balances for tests
+  /// 4. Inject the implants into the safe
+  /// 5. Set balances for tests
   function setUp() public {
     ERC20 usdc = ERC20(usdc_addr);
     ERC20 dai = ERC20(dai_addr);
+    ERC20 arb = ERC20(arb_addr);
+    ERC20 weth = ERC20(weth_addr);
+    deal(dao, 2 ether);
+    
+    
     vm.prank(dao);
     auth = new Auth();
+
     safe = IGnosisSafe(MULTISIG);
     core = new borgCore(auth);
     eject = new ejectImplant(auth, MULTISIG);
+    opGrant = new optimisticGrantImplant(auth, MULTISIG);
+    vetoGrant = new daoVetoGrantImplant(auth, MULTISIG, arb_addr, 259200, 1);
+    //create SignatureCondition.Logic for and
+     SignatureCondition.Logic logic = SignatureCondition.Logic.AND;
+    address[] memory signers = new address[](1); // Declare a dynamically-sized array with 1 element
+    signers[0] = address(owner);
+    sigCondition = new SignatureCondition(signers, 1, logic);
+    vm.prank(dao);
+    eject.addCondition(ConditionManager.Logic.AND, address(sigCondition));
+    target = jr;
+    amount = 1000 * 10**18;
 
+    vm.deal(jr, 1 ether); // Ensure user1 has ETH for transactions;
+    token = new MockERC20();
+    conditionGreater = new BalanceCondition(address(token), jr, amount, BalanceCondition.Comparison.GREATER);
+    conditionEqual = new BalanceCondition(address(token), jr, amount, BalanceCondition.Comparison.EQUAL);
+    conditionLess = new BalanceCondition(address(token), jr, amount, BalanceCondition.Comparison.LESS);
+
+    deal(address(token), jr, amount);
+
+    //for test: give out some tokens
     deal(owner, 2 ether);
     deal(MULTISIG, 2 ether);
+    deal(address(arb), vip, 1000000000 ether);
 
+    //sigers add jr, add the eject, optimistic grant, and veto grant implants.
     executeSingle(addOwner(address(jr)));
-    executeSingle(getAddEjectModule(address(eject)));
+    executeSingle(getAddModule(address(eject)));
+    executeSingle(getAddModule(address(opGrant)));
+    executeSingle(getAddModule(address(vetoGrant)));
 
+    //dao deploys the core, with the dao as the owner.
     vm.prank(dao);
     core.addContract(address(core), 2 ether);
-    /*   function addRangeParameterConstraint(
-        address _contract,
-        string memory _methodSignature,
-        uint8 _paramIndex,
-        uint256 _minValue,
-        uint256 _maxValue,
-        uint256 _byteOffset,
-        uint8 _byteLength
-    )*/
-    //borgCore.ParamType paramtype = borgCore.ParamType.UINT;
-   // executeSingle(getAddContractGuardData(address(core), address(core), 2 ether));
 
+
+    //Set the core as the guard for the safe
+    executeSingle(getSetGuardData(address(MULTISIG)));
+
+    //for test: give some tokens out
     deal(owner, 2 ether);
     deal(MULTISIG, 2 ether);
-  //  assertEq(dai.balanceOf(MULTISIG), 2 ether);
-     deal(address(dai), MULTISIG, 2 ether);
-   // deal(address(usdc), MULTISIG, 2 ether);
+    deal(address(dai), MULTISIG, 2 ether);
  
   }
+
+     function testCheckCondition_Greater_False() public {
+        assertFalse(conditionGreater.checkCondition(), "Should return false as balance is equal to amount");
+    }
+
+    function testCheckCondition_Greater_True() public {
+        deal(address(token), jr, 1001 ether); // Increase balance to be greater than amount
+        token.balanceOf(jr);
+        assertTrue(conditionGreater.checkCondition(), "Should return true as balance is greater than amount");
+    }
+
+    function testCheckCondition_Equal_True() public {
+        assertTrue(conditionEqual.checkCondition(), "Should return true as balance is equal to amount");
+    }
+
+    function testCheckCondition_Equal_False_Less() public {
+       // token.burn(target, 1); // Decrease balance to be less than amount
+        //burn target token value
+        vm.prank(jr);
+        token.transfer(burn, 1 ether);
+        assertFalse(conditionEqual.checkCondition(), "Should return false as balance is less than amount");
+    }
+
+    function testCheckCondition_Equal_False_Greater() public {
+        deal(address(token), target, 1001 ether); // Increase balance to be greater than amount
+        assertFalse(conditionEqual.checkCondition(), "Should return false as balance is greater than amount");
+    }
+
+    function testCheckCondition_Less_True() public {
+        vm.prank(jr);
+        ERC20(address(token)).transfer(burn, 2 ether);
+        assertTrue(conditionLess.checkCondition(), "Should return true as balance is less than amount");
+   }
+
+    function testCheckCondition_Less_False_Equal() public {
+        deal(address(token), target, 1000 ether); // Reset balance to equal amount
+        assertFalse(conditionLess.checkCondition(), "Should return false as balance is equal to amount");
+    }
+
+    function testCheckCondition_Less_False_Greater() public {
+        deal(address(token), target, 1001 ether); // Increase balance to be greater than amount
+        assertFalse(conditionLess.checkCondition(), "Should return false as balance is greater than amount");
+    }
+
+
+    function testBalanceAdjustment() public {
+        vm.prank(jr);
+        ERC20(address(token)).transfer(burn, 500 * 10**18); // Adjust balance
+        if (conditionGreater.checkCondition()) {
+            assertTrue(conditionGreater.checkCondition(), "Balance adjustment affects condition evaluation");
+        } else if (conditionLess.checkCondition()) {
+            assertTrue(conditionLess.checkCondition(), "Balance adjustment affects condition evaluation");
+        } else {
+            assertTrue(conditionEqual.checkCondition(), "Balance adjustment affects condition evaluation");
+        }
+    }
 
   /// @dev Initial Check that the safe and owner are set correctly.
   function testOwner() public { 
   assertEq(safe.isOwner(owner), true);
   }
 
-  //allow jr to remove himself from the safe
+  function testOpGrant() public {
+
+    vm.prank(dao);
+    opGrant.addApprovedGrantToken(dai_addr, 2 ether);
+
+    vm.prank(dao);
+    opGrant.setGrantLimits(1, 1711930764); // 1 grant by march 31, 2024
+
+    vm.prank(dao);
+    opGrant.toggleAllowOwners(true); 
+
+    vm.prank(owner);
+    opGrant.createGrant(dai_addr, address(jr), 2 ether);
+
+    //executeSingle(getCreateGrant(address(dai), address(jr), 2 ether));
+  }
+
+  function testOpGrantBORG() public {
+
+    vm.prank(dao);
+    core.addContract(address(opGrant), 2 ether);
+
+    vm.prank(dao);
+    opGrant.addApprovedGrantToken(dai_addr, 2 ether);
+
+    vm.prank(dao);
+    opGrant.setGrantLimits(1, 1711930764); // 1 grant by march 31, 2024
+
+    executeSingle(getCreateGrant(dai_addr, address(jr), 2 ether));
+  }
+
+  function testFailtOpGrantTooMany() public {
+
+    vm.prank(dao);
+    opGrant.addApprovedGrantToken(dai_addr, 2 ether);
+
+    vm.prank(dao);
+    opGrant.setGrantLimits(1, 1711930764); // 1 grant by march 31, 2024
+
+    vm.prank(owner);
+    opGrant.createGrant(dai_addr, address(jr), 2 ether);
+
+    vm.prank(owner);
+    opGrant.createGrant(dai_addr, address(jr), 2 ether);
+
+    //executeSingle(getCreateGrant(address(dai), address(jr), 2 ether));
+  }
+
+  function testFailtOpGrantTooMuch() public {
+
+    vm.prank(dao);
+    opGrant.addApprovedGrantToken(dai_addr, 2 ether);
+
+    vm.prank(dao);
+    opGrant.setGrantLimits(5, 1711930764); // 1 grant by march 31, 2024
+
+    vm.prank(owner);
+    opGrant.createGrant(dai_addr, address(jr), 3 ether);
+
+  }
+
+  function testFailtOpGrantWrongToken() public {
+
+    vm.prank(dao);
+    opGrant.addApprovedGrantToken(dai_addr, 2 ether);
+
+    vm.prank(dao);
+    opGrant.setGrantLimits(6, 1711930764); // 1 grant by march 31, 2024
+
+    vm.prank(owner);
+    opGrant.createGrant(usdc_addr, address(jr), 1 ether);
+
+  }
+
+    function testVetoGrant() public {
+
+    vm.prank(dao);
+    vetoGrant.addApprovedGrantToken(dai_addr, 2 ether);
+
+    vm.prank(owner);
+    uint256 id = vetoGrant.createProposal(dai_addr, address(jr), 2 ether);
+    skip(259205);
+
+    vm.prank(owner);
+    vetoGrant.executeProposal(id);
+    //assertion
+  }
+
+  function testFailVetoGrantVeto() public {
+
+    vm.prank(dao);
+    vetoGrant.addApprovedGrantToken(dai_addr, 2 ether);
+
+    vm.prank(owner);
+    uint256 id = vetoGrant.createProposal(dai_addr, address(jr), 2 ether);
+    skip(100);
+
+    vm.prank(vip);
+    vetoGrant.objectToProposal(id);
+    skip(259205);
+
+    vm.prank(owner);
+    vetoGrant.executeProposal(id);
+
+    }
+
   function testSelfEject() public {
     vm.prank(jr);
     eject.selfEject();
     assertEq(safe.isOwner(address(jr)), false);
   }
 
-    //jr cannot use the ejectOwner method bc he doesn't have ACL in the contract, can only selfEject
     function testFailejectNotApproved() public {
     vm.prank(jr);
     eject.ejectOwner(jr);
     assertEq(safe.isOwner(address(jr)), true);
-  }
-
-  /// @dev Ensure that the Guard contract is correctly whitelisted as a contract for the Safe.
-  function testGuardSaftey() public {
-    executeBatch(createTestBatch());
-    vm.prank(dao);
-    core.addContract(MULTISIG, 2 ether);
-  }
-
-  /// @dev An ERC20 transfer with no whitelists set should fail.
-  function testFailOnDai() public {
-    executeSingle(getSetGuardData(address(MULTISIG)));
-    executeSingle(getTransferData(address(dai), MULTISIG, .1 ether));
-  }
-
-  /// @dev An ERC20 transfer that is correctly whitelisted should pass.
-  function testPassOnDai() public {
-    executeSingle(getSetGuardData(address(MULTISIG)));
-    vm.prank(dao);
-    //core.addContract(address(dai), .01 ether);
-     core.addRangeParameterConstraint(
-      address(dai),
-      "transfer(address,uint256)",
-      0,
-      0,
-      1 ether,
-      36,
-      32
-    );
-    vm.prank(dao);
-    core.addRecipient(owner, .01 ether);
-    executeSingle(getTransferData(address(dai), owner, .01 ether));
-  }
-
-  /// @dev An ERC20 payment that is over the limit should revert.
-  function testFailOnDaiOverpayment() public {
-    executeSingle(getSetGuardData(address(MULTISIG)));
-    vm.prank(dao);
-    core.addContract(address(dai), .01 ether);
-
-    vm.prank(dao);
-    core.addRecipient(owner, .01 ether);
-    executeSingle(getTransferData(address(dai), owner, .1 ether));
-  }
-
-  /// @dev An ERC20 payment for a token that hasn't been whitelisted should fail.
-  function testFailOnUSDC() public {
-    executeSingle(getSetGuardData(address(MULTISIG)));
-    vm.prank(dao);
-    core.addContract(dai_addr, .01 ether);
-    vm.prank(dao);
-    core.addRecipient(owner, .01 ether);
-    executeSingle(getTransferData(dai_addr, owner, .01 ether));
-    executeSingle(getTransferData(usdc_addr, owner, .01 ether));
-  }
-
-  /// @dev An ERC20 payment that is over the limit of the recepient, not token contract, should still revert.
-  function testFailOnUSDCLimit() public {
-    executeSingle(getSetGuardData(address(MULTISIG)));
-    vm.prank(dao);
-    core.addContract(usdc_addr, .01 ether);
-
-    vm.prank(dao);
-    core.addRecipient(owner, 1 ether);
-    executeSingle(getTransferData(usdc_addr, owner, 1 ether));
-  }
-
-  /// @dev A native gas token transfer should fail on an unwhitelisted recepient.
-  function testFailOnNativeRug() public {
-    executeSingle(getSetGuardData(address(MULTISIG)));
-    executeSingle(getNativeTransferData(owner, 2 ether), 2 ether);
-  }
-  
-  /// @dev A native gas token transfer over the limit should fail.
-  function testFailOnNativeOverpayment() public {
-    executeSingle(getSetGuardData(address(MULTISIG)));
-    executeSingle(getaddRecipientGuardData(address(core), owner, .1 ether));
-    executeSingle(getNativeTransferData(owner, 2 ether), 2 ether);
-  }
-
-  /// @dev A native gas token transfer under the whitelisted limit should pass.
-  function testPassOnNativeDevPayment() public {
-    executeSingle(getSetGuardData(address(MULTISIG)));
-    vm.prank(dao);
-    core.addRecipient(owner, .01 ether);
-    executeSingle(getNativeTransferData(owner, .01 ether), .01 ether);
-  }
-
-  //Adding coverage tests for whitelist checks
-  function testFailOnAddThenRemoveDaiContract() public {
-    executeSingle(getSetGuardData(address(MULTISIG)));
-    core.addContract(address(dai), .01 ether);
-    executeSingle(getaddRecipientGuardData(address(core), owner, .01 ether));
-    executeSingle(getTransferData(address(dai), owner, .01 ether));
-    executeSingle(getRemoveContractGuardData(address(core), address(dai)));
-    executeSingle(getTransferData(address(dai), owner, .01 ether));
-  }
-
-  function testFailOnAddThenRemoveRecepient() public {
-    executeSingle(getSetGuardData(address(MULTISIG)));
-    executeSingle(getAddContractGuardData(address(core), address(dai), .01 ether));
-    executeSingle(getaddRecipientGuardData(address(core), owner, .01 ether));
-    executeSingle(getTransferData(address(dai), owner, .01 ether));
-    executeSingle(getRemoveRecepientGuardData(address(core), owner));
-    executeSingle(getTransferData(address(dai), owner, .01 ether));
   }
 
 
@@ -212,7 +315,6 @@ contract ProjectTest is Test {
         setGuardFunctionSignature,
         address(core)
     );
-
 
     batch[0] = GnosisTransaction({to: address(safe), value: 0, data: guardData});
 
@@ -280,7 +382,7 @@ contract ProjectTest is Test {
         return txData;
     }
 
-    function getAddEjectModule(address to) public view returns (GnosisTransaction memory) {
+    function getAddModule(address to) public view returns (GnosisTransaction memory) {
         bytes4 addContractMethod = bytes4(
             keccak256("enableModule(address)")
         );
@@ -290,6 +392,21 @@ contract ProjectTest is Test {
             to
         );
         GnosisTransaction memory txData = GnosisTransaction({to: address(safe), value: 0, data: guardData}); 
+        return txData;
+    }
+
+    function getCreateGrant(address token, address rec, uint256 amount) public view returns (GnosisTransaction memory) {
+        bytes4 addContractMethod = bytes4(
+            keccak256("createGrant(address,address,uint256)")
+        );
+
+        bytes memory guardData = abi.encodeWithSelector(
+            addContractMethod,
+            token,
+            rec,
+            amount
+        );
+        GnosisTransaction memory txData = GnosisTransaction({to: address(opGrant), value: 0, data: guardData}); 
         return txData;
     }
 
@@ -321,13 +438,13 @@ contract ProjectTest is Test {
         return txData;
     }
 
-    function getaddRecipientGuardData(address to, address allow, uint256 amount) public view returns (GnosisTransaction memory) {
-        bytes4 addRecipientMethod = bytes4(
-            keccak256("addRecipient(address,uint256)")
+    function getAddRecepientGuardData(address to, address allow, uint256 amount) public view returns (GnosisTransaction memory) {
+        bytes4 addRecepientMethod = bytes4(
+            keccak256("addRecepient(address,uint256)")
         );
 
         bytes memory recData = abi.encodeWithSelector(
-            addRecipientMethod,
+            addRecepientMethod,
             address(allow),
             amount
         );
