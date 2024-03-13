@@ -254,7 +254,6 @@ contract ProjectTest is Test {
 
   }
 
-
   function testSelfEject() public {
     vm.prank(jr);
     eject.selfEject();

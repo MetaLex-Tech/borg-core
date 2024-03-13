@@ -314,7 +314,6 @@ function testSign_AllSigners_AndLogic() public {
 
   }
 
-
   function testSelfEject() public {
     vm.prank(jr);
     eject.selfEject();
