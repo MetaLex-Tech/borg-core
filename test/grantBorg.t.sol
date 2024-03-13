@@ -31,6 +31,7 @@ contract ProjectTest is Test {
   address usdc_addr = 0xaf88d065e77c8cC2239327C5EDb3A432268e5831; //make sure this matches your chain
   address dai_addr = 0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1; //make sure this matches your chain
   address arb_addr = 0x912CE59144191C1204E64559FE8253a0e49E6548; //arb token
+  address voting_auth = address(0xDA0A074);
 
  // represents the DAO's On chain power address
   address dao = address(0xDA0);
@@ -182,7 +183,7 @@ contract ProjectTest is Test {
     vetoGrant.addApprovedGrantToken(dai_addr, 2 ether);
 
     vm.prank(owner);
-    uint256 id = vetoGrant.createProposal(dai_addr, address(jr), 2 ether);
+    uint256 id = vetoGrant.createProposal(dai_addr, address(jr), 2 ether, voting_auth);
     skip(259205);
 
     vm.prank(owner);
@@ -196,7 +197,7 @@ contract ProjectTest is Test {
     vetoGrant.addApprovedGrantToken(dai_addr, 2 ether);
 
     vm.prank(owner);
-    uint256 id = vetoGrant.createProposal(dai_addr, address(jr), 2 ether);
+    uint256 id = vetoGrant.createProposal(dai_addr, address(jr), 2 ether, voting_auth);
     skip(100);
 
     vm.prank(vip);

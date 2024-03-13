@@ -167,38 +167,6 @@ contract ProjectTest is Test {
 
   }
 
-    function testVetoGrant() public {
-
-    vm.prank(dao);
-    vetoGrant.addApprovedGrantToken(dai_addr, 2 ether);
-
-    vm.prank(owner);
-    uint256 id = vetoGrant.createProposal(dai_addr, address(jr), 2 ether);
-    skip(259205);
-
-    vm.prank(owner);
-    vetoGrant.executeProposal(id);
-    //assertion
-  }
-
-  function testFailVetoGrantVeto() public {
-
-    vm.prank(dao);
-    vetoGrant.addApprovedGrantToken(dai_addr, 2 ether);
-
-    vm.prank(owner);
-    uint256 id = vetoGrant.createProposal(dai_addr, address(jr), 2 ether);
-    skip(100);
-
-    vm.prank(vip);
-    vetoGrant.objectToProposal(id);
-    skip(259205);
-
-    vm.prank(owner);
-    vetoGrant.executeProposal(id);
-
-    }
-
    function testDAOEject() public {
     vm.prank(dao);
     eject.ejectOwner(address(jr));

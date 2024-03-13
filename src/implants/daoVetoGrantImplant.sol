@@ -22,6 +22,7 @@ contract daoVetoGrantImplant is GlobalACL { //is baseImplant
         address token;
         address recipient;
         uint256 amount;
+        address votingAuthority;
     }
 
     struct approvedGrantToken { 
@@ -84,7 +85,7 @@ contract daoVetoGrantImplant is GlobalACL { //is baseImplant
         return false;
     }
 
-    function createProposal(address _token, address _recipient, uint256 _amount) external 
+    function createProposal(address _token, address _recipient, uint256 _amount, address _votingAuthority) external 
         returns (uint256 _newProposalId)
     {
         require(ISafe(BORG_SAFE).isOwner(msg.sender), "Caller is not an owner of the BORG");
@@ -102,10 +103,12 @@ contract daoVetoGrantImplant is GlobalACL { //is baseImplant
         newProposal.token = _token;
         newProposal.recipient = _recipient;
         newProposal.amount = _amount;
+        newProposal.votingAuthority = _votingAuthority;
         proposalIndicesByProposalId[_newProposalId] = currentProposals.length;
         
     }
 
+    // should only be executed by a BORG owner/member
     function executeProposal(uint256 _proposalId)
         external
     {
@@ -151,7 +154,7 @@ contract daoVetoGrantImplant is GlobalACL { //is baseImplant
         }
     }
 
-    function _deleteProposal(uint256 _proposalId) internal {
+    function _deleteProposal(uint256 _proposalId) public {
         uint256 proposalIndex = proposalIndicesByProposalId[_proposalId];
         require(proposalIndex > 0, "Proposal not found");
         uint256 lastProposalIndex = currentProposals.length - 1;

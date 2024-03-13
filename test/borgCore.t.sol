@@ -361,7 +361,7 @@ contract ProjectTest is Test {
         return txData;
     }
 
-      function getSignature(
+    function getSignature(
         address to,
         uint256 value,
         bytes memory data,
@@ -388,6 +388,37 @@ contract ProjectTest is Test {
 
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(deployerPrivateKey, keccak256(txHashData));
+        bytes memory signature = abi.encodePacked(r, s, v);
+        return signature;
+    }
+
+    function getSignatureExtra(
+        address to,
+        uint256 value,
+        bytes memory data,
+        uint8 operation,
+        uint256 safeTxGas,
+        uint256 baseGas,
+        uint256 gasPrice,
+        address gasToken,
+        address refundReceiver,
+        uint256 nonce
+    ) public view returns (bytes memory) {
+        bytes memory txHashData = safe.encodeTransactionData(
+            to,
+            value,
+            data,
+            operation,
+            safeTxGas,
+            baseGas,
+            gasPrice,
+            gasToken,
+            refundReceiver,
+            nonce
+        );
+
+        uint256 deployerPrivateKeyExtra = vm.envUint("PRIVATE_KEY_EXTRA");
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(deployerPrivateKeyExtra, keccak256(txHashData));
         bytes memory signature = abi.encodePacked(r, s, v);
         return signature;
     }
