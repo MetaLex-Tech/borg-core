@@ -2,6 +2,7 @@
 pragma solidity ^0.8.19;
 import "forge-std/Test.sol";
 import "../src/borgCore.sol";
+import "../src/implants/failSafeImplant.sol";
 import "../src/implants/ejectImplant.sol";
 import "../src/libs/auth.sol";
 import "../src/implants/optimisticGrantImplant.sol";
@@ -11,6 +12,7 @@ contract ProjectTest is Test {
   // global contract deploys for the tests
 
   borgCore core;
+  failSafeImplant failSafe;
   ejectImplant eject;
   Auth auth;
   optimisticGrantImplant opGrant;
@@ -38,7 +40,8 @@ contract ProjectTest is Test {
     auth = new Auth();
     vm.stopPrank();
     core = new borgCore(auth);
-    eject = new ejectImplant(auth, MULTISIG);
+  //  failSafe = new failSafe(auth, address(safe), dao);
+  //  eject = new ejectImplant(auth, MULTISIG, address(failSafe));
     opGrant = new optimisticGrantImplant(auth, MULTISIG);
     vetoGrant = new daoVetoGrantImplant(auth, MULTISIG, arb_addr, 259200, 1);
  

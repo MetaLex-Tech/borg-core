@@ -2,6 +2,7 @@
 pragma solidity ^0.8.19;
 import "forge-std/Test.sol";
 import "../src/borgCore.sol";
+import "../src/implants/failSafeImplant.sol";
 import "../src/implants/ejectImplant.sol";
 import "solady/tokens/ERC20.sol";
 import "../src/implants/optimisticGrantImplant.sol";
@@ -15,6 +16,7 @@ contract ProjectTest is Test {
   // global contract deploys for the tests
   IGnosisSafe safe;
   borgCore core;
+  failSafeImplant failSafe;
   ejectImplant eject;
   Auth auth;
   optimisticGrantImplant opGrant;
@@ -66,7 +68,8 @@ contract ProjectTest is Test {
 
     safe = IGnosisSafe(MULTISIG);
     core = new borgCore(auth);
-    eject = new ejectImplant(auth, MULTISIG);
+    failSafe = new failSafeImplant(auth, address(safe), dao);
+    eject = new ejectImplant(auth, MULTISIG, address(failSafe));
     opGrant = new optimisticGrantImplant(auth, MULTISIG);
     vetoGrant = new daoVetoGrantImplant(auth, MULTISIG, arb_addr, 259200, 1);
     //create SignatureCondition.Logic for and
@@ -325,7 +328,6 @@ function testSign_AllSigners_AndLogic() public {
     eject.ejectOwner(jr);
     assertEq(safe.isOwner(address(jr)), true);
   }
-
 
     /* TEST METHODS */
     //This section needs refactoring (!!) but going for speed here..

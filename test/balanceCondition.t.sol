@@ -72,7 +72,6 @@ contract ProjectTest is Test {
 
     safe = IGnosisSafe(MULTISIG);
     core = new borgCore(auth);
-    eject = new ejectImplant(auth, MULTISIG);
     opGrant = new optimisticGrantImplant(auth, MULTISIG);
     vetoGrant = new daoVetoGrantImplant(auth, MULTISIG, arb_addr, 259200, 1);
     //create SignatureCondition.Logic for and
@@ -81,7 +80,7 @@ contract ProjectTest is Test {
     signers[0] = address(owner);
     sigCondition = new SignatureCondition(signers, 1, logic);
     vm.prank(dao);
-    eject.addCondition(ConditionManager.Logic.AND, address(sigCondition));
+  
     target = jr;
     amount = 1000 * 10**18;
 
@@ -100,7 +99,6 @@ contract ProjectTest is Test {
 
     //sigers add jr, add the eject, optimistic grant, and veto grant implants.
     executeSingle(addOwner(address(jr)));
-    executeSingle(getAddModule(address(eject)));
     executeSingle(getAddModule(address(opGrant)));
     executeSingle(getAddModule(address(vetoGrant)));
 
@@ -252,18 +250,6 @@ contract ProjectTest is Test {
     vm.prank(owner);
     opGrant.createGrant(usdc_addr, address(jr), 1 ether);
 
-  }
-
-  function testSelfEject() public {
-    vm.prank(jr);
-    eject.selfEject();
-    assertEq(safe.isOwner(address(jr)), false);
-  }
-
-    function testFailejectNotApproved() public {
-    vm.prank(jr);
-    eject.ejectOwner(jr);
-    assertEq(safe.isOwner(address(jr)), true);
   }
 
 

@@ -6,6 +6,7 @@ import "../src/implants/ejectImplant.sol";
 import "solady/tokens/ERC20.sol";
 import "../src/libs/auth.sol";
 import "./libraries/safe.t.sol";
+import "../src/implants/failSafeImplant.sol";
 
 contract ProjectTest is Test {
   // global contract deploys for the tests
@@ -13,6 +14,7 @@ contract ProjectTest is Test {
   borgCore core;
   ejectImplant eject;
   Auth auth;
+  failSafeImplant failSafe;
 
   IMultiSendCallOnly multiSendCallOnly =
     IMultiSendCallOnly(0xd34C0841a14Cd53428930D4E0b76ea2406603B00); //make sure this matches your chain
@@ -41,7 +43,8 @@ contract ProjectTest is Test {
     auth = new Auth();
     safe = IGnosisSafe(MULTISIG);
     core = new borgCore(auth);
-    eject = new ejectImplant(auth, MULTISIG);
+    failSafe = new failSafeImplant(auth, address(safe), dao);
+    eject = new ejectImplant(auth, MULTISIG, address(failSafe));
 
     deal(owner, 2 ether);
     deal(MULTISIG, 2 ether);

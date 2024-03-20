@@ -4,24 +4,24 @@ pragma solidity ^0.8.19;
 import "../interfaces/ISafe.sol";
 import "../libs/auth.sol";
 import "forge-std/interfaces/IERC20.sol";
+import "../libs/conditions/conditionManager.sol";
 
-contract daoVoteGrantImplant is GlobalACL { //is baseImplant
+contract daoVoteGrantImplant is GlobalACL, ConditionManager { //is baseImplant
 
     address public immutable BORG_SAFE;
     address public immutable governanceToken;
     uint256 public duration;
-    uint256 public objectionsThreshold;
     uint256 public lastMotionId;
+    address public governanceAdapter;
 
      struct Proposal {
         uint256 id;
         uint256 duration;
         uint256 startTime;
-        uint256 objectionsThreshold;
-        uint256 objectionsAmount;
         address token;
         address recipient;
         uint256 amount;
+        address votingAuthority;
     }
 
     struct approvedGrantToken { 
@@ -30,17 +30,18 @@ contract daoVoteGrantImplant is GlobalACL { //is baseImplant
         uint256 amountSpent;
     }
 
+    error daoVoteGrantImplant_NotAuthorized();
+    error daoVoteGrantImplant_ProposalExpired();
+
     Proposal[] public currentProposals;
     approvedGrantToken[] public approvedGrantTokens;
     mapping(uint256 => uint256) internal proposalIndicesByProposalId;
-    mapping(uint256 => mapping(address => bool)) public objections;
     uint256 internal constant PERC_SCALE = 10000;
 
-    constructor(Auth _auth, address _borgSafe, address _governanceToken, uint256 _duration, uint256 _objectionsThreshold) GlobalACL(_auth) {
+    constructor(Auth _auth, address _borgSafe, address _governanceToken, uint256 _duration) ConditionManager(_auth) {
         BORG_SAFE = _borgSafe;
         governanceToken = _governanceToken;
         duration = _duration;
-        objectionsThreshold = _objectionsThreshold;
         lastMotionId=0;
     }
 
@@ -62,11 +63,11 @@ contract daoVoteGrantImplant is GlobalACL { //is baseImplant
         }
     }
 
-    function updateObjectionsThreshold(uint256 _objectionsThreshold) external onlyOwner {
-        objectionsThreshold = _objectionsThreshold;
+    function setGovernanceAdapter(address _governanceAdapter) external onlyOwner {
+        governanceAdapter = _governanceAdapter;
     }
 
-    function getApprovedGrantTokenByAddress(address _token) internal returns (approvedGrantToken storage) {
+    function getApprovedGrantTokenByAddress(address _token) internal view returns (approvedGrantToken storage) {
         for (uint256 i = 0; i < approvedGrantTokens.length; i++) {
             if (approvedGrantTokens[i].token == _token) {
                 return approvedGrantTokens[i];
@@ -84,7 +85,7 @@ contract daoVoteGrantImplant is GlobalACL { //is baseImplant
         return false;
     }
 
-    function createProposal(address _token, address _recipient, uint256 _amount) external 
+    function createProposal(address _token, address _recipient, uint256 _amount, address _votingAuthority) external 
         returns (uint256 _newProposalId)
     {
         require(ISafe(BORG_SAFE).isOwner(msg.sender), "Caller is not an owner of the BORG");
@@ -98,20 +99,28 @@ contract daoVoteGrantImplant is GlobalACL { //is baseImplant
         newProposal.id = _newProposalId;
         newProposal.startTime = block.timestamp;
         newProposal.duration = duration;
-        newProposal.objectionsThreshold = objectionsThreshold;
         newProposal.token = _token;
         newProposal.recipient = _recipient;
         newProposal.amount = _amount;
+        newProposal.votingAuthority = _votingAuthority;
         proposalIndicesByProposalId[_newProposalId] = currentProposals.length;
         
     }
 
+    // should only be executed by a BORG owner/member
     function executeProposal(uint256 _proposalId)
         external
     {
         Proposal storage proposal = _getProposal(_proposalId);
-        require(proposal.startTime + proposal.duration <= block.timestamp, "Proposal is not ready to be executed");
-
+        require(checkConditions(), "Conditions not met");
+        require(msg.sender == proposal.votingAuthority, "Caller is not the voting authority");
+        if(proposal.startTime + proposal.duration < block.timestamp)
+        {
+            //proposal has expired
+            _deleteProposal(_proposalId);
+            revert daoVoteGrantImplant_ProposalExpired();
+        }
+            
         address recipient = proposal.recipient;
         address token = proposal.token;
         uint256 amount = proposal.amount;
@@ -132,26 +141,8 @@ contract daoVoteGrantImplant is GlobalACL { //is baseImplant
         return currentProposals[proposalIndex - 1];
     }
 
-    function objectToProposal(uint256 _proposalId) external {
-        Proposal storage proposal = _getProposal(_proposalId);
-        require(!objections[_proposalId][msg.sender], "Objector has already objected");
-        objections[_proposalId][msg.sender] = true;
+    function _deleteProposal(uint256 _proposalId) public {
 
-        uint256 objectorBalance = IERC20(governanceToken).balanceOf(msg.sender);
-        require(objectorBalance > 0, "Objector has no governance tokens");
-
-        uint256 totalSupply = IERC20(governanceToken).totalSupply();
-        uint256 newObjectionsAmount = proposal.objectionsAmount + objectorBalance;
-        uint256 newObjectionsAmountPct = (PERC_SCALE * newObjectionsAmount) / totalSupply;
-
-        if (newObjectionsAmountPct < proposal.objectionsThreshold) {
-            proposal.objectionsAmount = newObjectionsAmount;
-        } else {
-            _deleteProposal(_proposalId);
-        }
-    }
-
-    function _deleteProposal(uint256 _proposalId) internal {
         uint256 proposalIndex = proposalIndicesByProposalId[_proposalId];
         require(proposalIndex > 0, "Proposal not found");
         uint256 lastProposalIndex = currentProposals.length - 1;

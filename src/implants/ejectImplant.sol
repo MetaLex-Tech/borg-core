@@ -8,9 +8,11 @@ import "../libs/conditions/conditionManager.sol";
 contract ejectImplant is GlobalACL, ConditionManager { //is baseImplant
 
     address public immutable BORG_SAFE;
+    address public immutable FAIL_SAFE;
 
-    constructor(Auth _auth, address _borgSafe) ConditionManager(_auth) {
+    constructor(Auth _auth, address _borgSafe, address _failSafe) ConditionManager(_auth) {
         BORG_SAFE = _borgSafe;
+        FAIL_SAFE = _failSafe;
     }
 
     function ejectOwner(address owner) external onlyOwner {
@@ -49,12 +51,4 @@ contract ejectImplant is GlobalACL, ConditionManager { //is baseImplant
         gnosisSafe.execTransactionFromModule(address(gnosisSafe), 0, data, Enum.Operation.Call);
     }
 
- /* function _execTransaction(
-        address _to,
-        bytes memory _calldata
-    ) internal returns (bytes memory _ret) {
-        ISafe(BORG_SAFE).execTransactionFromModule(_to, 0, _calldata, 0);
-        bool success;
-
-    }*/
 }

@@ -2,7 +2,6 @@
 pragma solidity ^0.8.19;
 import "forge-std/Test.sol";
 import "../src/borgCore.sol";
-import "../src/implants/ejectImplant.sol";
 import "solady/tokens/ERC20.sol";
 import "../src/implants/optimisticGrantImplant.sol";
 import "../src/implants/daoVetoGrantImplant.sol";
@@ -15,7 +14,6 @@ contract ProjectTest is Test {
   // global contract deploys for the tests
   IGnosisSafe safe;
   borgCore core;
-  ejectImplant eject;
   Auth auth;
   optimisticGrantImplant opGrant;
   daoVetoGrantImplant vetoGrant;
@@ -62,7 +60,6 @@ contract ProjectTest is Test {
 
     safe = IGnosisSafe(MULTISIG);
     core = new borgCore(auth);
-    eject = new ejectImplant(auth, MULTISIG);
     opGrant = new optimisticGrantImplant(auth, MULTISIG);
     vetoGrant = new daoVetoGrantImplant(auth, MULTISIG, arb_addr, 259200, 1);
     //create SignatureCondition.Logic for and
@@ -71,7 +68,6 @@ contract ProjectTest is Test {
     signers[0] = address(owner);
     sigCondition = new SignatureCondition(signers, 1, logic);
     vm.prank(dao);
-    eject.addCondition(ConditionManager.Logic.AND, address(sigCondition));
     targetTime = block.timestamp + 1 days; // Set the target time to 1 day from now
     timeConditionBefore = new TimeCondition(targetTime, TimeCondition.Comparison.BEFORE);
     timeConditionAfter = new TimeCondition(targetTime, TimeCondition.Comparison.AFTER);
@@ -81,9 +77,8 @@ contract ProjectTest is Test {
     deal(MULTISIG, 2 ether);
     deal(address(arb), vip, 1000000000 ether);
 
-    //sigers add jr, add the eject, optimistic grant, and veto grant implants.
+    //sigers add jr, optimistic grant, and veto grant implants.
     executeSingle(addOwner(address(jr)));
-    executeSingle(getAddModule(address(eject)));
     executeSingle(getAddModule(address(opGrant)));
     executeSingle(getAddModule(address(vetoGrant)));
 
@@ -235,17 +230,7 @@ contract ProjectTest is Test {
 
   }
 
-  function testSelfEject() public {
-    vm.prank(jr);
-    eject.selfEject();
-    assertEq(safe.isOwner(address(jr)), false);
-  }
 
-    function testFailejectNotApproved() public {
-    vm.prank(jr);
-    eject.ejectOwner(jr);
-    assertEq(safe.isOwner(address(jr)), true);
-  }
 
 
     /* TEST METHODS */
@@ -374,18 +359,6 @@ contract ProjectTest is Test {
         return txData;
     }
 
-    function callEjectToRemoveImposter(address toRemove) public view returns (GnosisTransaction memory) {
-        bytes4 addContractMethod = bytes4(
-            keccak256("removeOwner(address)")
-        );
-
-        bytes memory guardData = abi.encodeWithSelector(
-            addContractMethod,
-            toRemove
-        );
-        GnosisTransaction memory txData = GnosisTransaction({to: address(eject), value: 0, data: guardData}); 
-        return txData;
-    }
 
     function getAddRecepientGuardData(address to, address allow, uint256 amount) public view returns (GnosisTransaction memory) {
         bytes4 addRecepientMethod = bytes4(

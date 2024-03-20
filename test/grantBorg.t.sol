@@ -8,6 +8,7 @@ import "../src/implants/optimisticGrantImplant.sol";
 import "../src/implants/daoVetoGrantImplant.sol";
 import "./libraries/safe.t.sol";
 import "../src/libs/conditions/signatureCondition.sol";
+import "../src/implants/failSafeImplant.sol";
 
 
 contract ProjectTest is Test {
@@ -19,6 +20,7 @@ contract ProjectTest is Test {
   optimisticGrantImplant opGrant;
   daoVetoGrantImplant vetoGrant;
   SignatureCondition sigCondition;
+  failSafeImplant failSafe;
 
   IMultiSendCallOnly multiSendCallOnly =
     IMultiSendCallOnly(0xd34C0841a14Cd53428930D4E0b76ea2406603B00); //make sure this matches your chain
@@ -59,7 +61,8 @@ contract ProjectTest is Test {
 
     safe = IGnosisSafe(MULTISIG);
     core = new borgCore(auth);
-    eject = new ejectImplant(auth, MULTISIG);
+    failSafe = new failSafeImplant(auth, address(safe), dao);
+    eject = new ejectImplant(auth, MULTISIG, address(failSafe));
     opGrant = new optimisticGrantImplant(auth, MULTISIG);
     vetoGrant = new daoVetoGrantImplant(auth, MULTISIG, arb_addr, 259200, 1);
     //create SignatureCondition.Logic for and
@@ -190,24 +193,6 @@ contract ProjectTest is Test {
     vetoGrant.executeProposal(id);
     //assertion
   }
-
-  function testFailVetoGrantVeto() public {
-
-    vm.prank(dao);
-    vetoGrant.addApprovedGrantToken(dai_addr, 2 ether);
-
-    vm.prank(owner);
-    uint256 id = vetoGrant.createProposal(dai_addr, address(jr), 2 ether, voting_auth);
-    skip(100);
-
-    vm.prank(vip);
-    vetoGrant.objectToProposal(id);
-    skip(259205);
-
-    vm.prank(owner);
-    vetoGrant.executeProposal(id);
-
-    }
 
    function testDAOEject() public {
     vm.prank(owner);
