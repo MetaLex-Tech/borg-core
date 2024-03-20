@@ -48,12 +48,11 @@ contract GrantMilestones is GlobalACL {
         milestone.isAchieved = true;
 
         // Execute the token transfer based on the milestone specifics
-        if(milestone.token == address(0)) { // Assuming this means native currency transfer
+        if(milestone.token == address(0)) { // native currency transfer
             ISafe(BORG_SAFE).execTransactionFromModule(msg.sender, milestone.tokensToUnlock, "", Enum.Operation.Call);
         } else { // ERC20 token transfer
             ISafe(BORG_SAFE).execTransactionFromModule(milestone.token, 0, abi.encodeWithSignature("transfer(address,uint256)", msg.sender, milestone.tokensToUnlock), Enum.Operation.Call);
         }
     }
 
-    // Additional functions as needed, e.g., updating milestones, checking conditions, etc.
 }
