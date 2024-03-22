@@ -4,6 +4,7 @@ pragma solidity ^0.8.19;
 import "../interfaces/ISafe.sol";
 import "../libs/auth.sol";
 import "forge-std/interfaces/IERC20.sol";
+import "../interfaces/IGovernanceAdapter.sol";
 
 contract daoVetoGrantImplant is GlobalACL { //is baseImplant
 
@@ -12,6 +13,7 @@ contract daoVetoGrantImplant is GlobalACL { //is baseImplant
     uint256 public duration;
     uint256 public objectionsThreshold;
     uint256 public lastMotionId;
+  address public governanceAdapter;
 
      struct Proposal {
         uint256 id;
@@ -62,6 +64,11 @@ contract daoVetoGrantImplant is GlobalACL { //is baseImplant
         }
     }
 
+    function setGovernanceAdapter(address _governanceAdapter) external onlyOwner {
+        governanceAdapter = _governanceAdapter;
+    }
+
+
     function updateObjectionsThreshold(uint256 _objectionsThreshold) external onlyOwner {
         objectionsThreshold = _objectionsThreshold;
     }
@@ -103,6 +110,7 @@ contract daoVetoGrantImplant is GlobalACL { //is baseImplant
         newProposal.amount = _amount;
         newProposal.votingAuthority = _votingAuthority;
         proposalIndicesByProposalId[_newProposalId] = currentProposals.length;
+
         
     }
 

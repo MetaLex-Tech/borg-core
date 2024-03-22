@@ -2,7 +2,6 @@
 pragma solidity ^0.8.19;
 
 import "safe-contracts/base/GuardManager.sol";
-import "safe-contracts/interfaces/IERC165.sol";
 import "./libs/auth.sol";
 
 contract borgCore is BaseGuard, GlobalACL {
@@ -13,7 +12,7 @@ contract borgCore is BaseGuard, GlobalACL {
     error BORG_CORE_InvalidContract();
     error BORG_CORE_AmountOverLimit();
     
-    enum ParamType { UINT, ADDRESS, STRING, BYTES }
+    enum ParamType { UINT, ADDRESS, STRING, BYTES, BOOL, INT }
 
     struct ParamConstraint {
         bool exists;
@@ -38,11 +37,7 @@ contract borgCore is BaseGuard, GlobalACL {
 
     mapping(address => ContractConstraint) public whitelist;
 
-
-
     /// Whitelist Structs
-    /// @dev We can add more properties to the structs to add more functionality  
-    /// Future ideas: method limitation of functions, scope, delegate caller
     /// mapping(bytes4 => bool) functionWhitelist;
     struct Recipient {
         bool approved;
@@ -264,6 +259,20 @@ contract borgCore is BaseGuard, GlobalACL {
                     // Extracting bytes
                     bytes memory addrValue = abi.decode(_methodCallData[param.byteOffset:param.byteOffset+param.byteLength], (bytes));
                     if (keccak256(abi.encodePacked(addrValue)) != keccak256(param.exactMatch)) {
+                        return false;
+                    }
+                }
+                else if (param.paramType == ParamType.BOOL) {
+                    // Extracting a bool value
+                    bool boolValue = abi.decode(_methodCallData[param.byteOffset:param.byteOffset+param.byteLength], (bool));
+                    if (boolValue != abi.decode(param.exactMatch, (bool))) {
+                        return false;
+                    }
+                }
+                else if (param.paramType == ParamType.INT256) {
+                    // Extracting an int value
+                    int intValue = abi.decode(_methodCallData[param.byteOffset:param.byteOffset+param.byteLength], (int));
+                    if (intValue < int(param.minValue) || intValue > int(param.maxValue)) {
                         return false;
                     }
                 }

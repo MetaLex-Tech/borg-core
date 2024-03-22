@@ -142,7 +142,10 @@ contract daoVoteGrantImplant is GlobalACL, ConditionManager { //is baseImplant
     }
 
     function _deleteProposal(uint256 _proposalId) public {
-
+        Proposal storage proposal = _getProposal(_proposalId);
+        if(msg.sender!=proposal.votingAuthority)
+            revert daoVoteGrantImplant_NotAuthorized();
+            
         uint256 proposalIndex = proposalIndicesByProposalId[_proposalId];
         require(proposalIndex > 0, "Proposal not found");
         uint256 lastProposalIndex = currentProposals.length - 1;

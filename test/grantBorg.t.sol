@@ -3,13 +3,13 @@ pragma solidity ^0.8.19;
 import "forge-std/Test.sol";
 import "../src/borgCore.sol";
 import "../src/implants/ejectImplant.sol";
-import "solady/tokens/ERC20.sol";
 import "../src/implants/optimisticGrantImplant.sol";
 import "../src/implants/daoVetoGrantImplant.sol";
 import "./libraries/safe.t.sol";
 import "../src/libs/conditions/signatureCondition.sol";
 import "../src/implants/failSafeImplant.sol";
-
+import "./libraries/mocks/MockGovToken.sol";
+import "./libraries/mocks/MockDAO.sol";
 
 contract ProjectTest is Test {
   // global contract deploys for the tests
@@ -21,6 +21,8 @@ contract ProjectTest is Test {
   daoVetoGrantImplant vetoGrant;
   SignatureCondition sigCondition;
   failSafeImplant failSafe;
+  MockERC20Votes govToken;
+  MockDAO mockDao;
 
   IMultiSendCallOnly multiSendCallOnly =
     IMultiSendCallOnly(0xd34C0841a14Cd53428930D4E0b76ea2406603B00); //make sure this matches your chain
@@ -58,6 +60,10 @@ contract ProjectTest is Test {
     
     vm.prank(dao);
     auth = new Auth();
+
+    //set up a mock DAO Governance contract
+    govToken = new MockERC20Votes("GovToken", "GT");
+    mockDao = new MockDAO(govToken);
 
     safe = IGnosisSafe(MULTISIG);
     core = new borgCore(auth);
@@ -121,6 +127,24 @@ contract ProjectTest is Test {
     opGrant.createGrant(dai_addr, address(jr), 2 ether);
 
     //executeSingle(getCreateGrant(address(dai), address(jr), 2 ether));
+  }
+
+ function testCreateProposal() public {
+        // Define proposal parameters
+        address[] memory targets = new address[](1);
+        uint256[] memory values = new uint256[](1);
+        bytes[] memory calldatas = new bytes[](1);
+        string memory description = "Proposal #1: Change Something";
+
+        // Mock action - for demonstration, target the DAO contract itself with a dummy action
+        targets[0] = address(mockDao);
+        values[0] = 0;
+        calldatas[0] = abi.encodeWithSignature("quorum(uint256)", 1);
+
+        // Create the proposal
+        uint256 proposalId = mockDao.propose(targets, values, calldatas, description);
+
+        // Additional steps would include voting on and executing the proposal
   }
 
   function testOpGrantBORG() public {
