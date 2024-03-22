@@ -252,7 +252,6 @@ contract ProjectTest is Test {
 
   }
 
-
     /* TEST METHODS */
     //This section needs refactoring (!!) but going for speed here..
     function createTestBatch() public returns (GnosisTransaction[] memory) {

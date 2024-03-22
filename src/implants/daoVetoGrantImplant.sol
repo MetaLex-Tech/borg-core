@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity ^0.8.19;
 
 import "../interfaces/ISafe.sol";
@@ -142,7 +142,6 @@ contract daoVetoGrantImplant is GlobalACL { //is baseImplant
     }
 
     function _deleteProposal(uint256 _proposalId) public {
-
         uint256 proposalIndex = proposalIndicesByProposalId[_proposalId];
         require(proposalIndex > 0, "Proposal not found");
         uint256 lastProposalIndex = currentProposals.length - 1;
