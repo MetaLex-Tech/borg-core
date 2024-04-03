@@ -1,33 +1,26 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+
+/*
+************************************
+██████╗  ██████╗ ██████╗  ██████╗     ██████╗ ██████╗ ██████╗ ███████╗
+██╔══██╗██╔═══██╗██╔══██╗██╔════╝     ██╔═══╝██╔═══██╗██╔══██╗██╔════╝
+██████╔╝██║   ██║██████╔╝██║  ███═════██║    ██║   ██║██████╔╝█████╗  
+██╔══██╗██║   ██║██╔══██╗██║   ██╔════██║    ██║   ██║██╔══██╗██╔══╝  
+██████╔╝╚██████╔╝██║  ██║╚██████╔╝    ██████╗╚██████╔╝██║  ██║███████╗
+╚═════╝  ╚═════╝ ╚═╝  ╚═╝ ╚═════╝     ╚═════╝ ╚═════╝ ╚═╝  ╚═╝╚══════╝  
+                                    *************************************
+                                                                        */
+
 pragma solidity ^0.8.19;
 
 import "safe-contracts/base/GuardManager.sol";
 import "./libs/auth.sol";
 import "forge-std/console.sol";
 
+/**
+ * @title      BorgCore
+ **/
 contract borgCore is BaseGuard, GlobalACL {
-
-    /// Error Messages
-    error BORG_CORE_InvalidRecipient();
-    error BORG_CORE_InvalidContract();
-    error BORG_CORE_AmountOverLimit();
-    error BORG_CORE_ArraysDoNotMatch();
-    error BORG_CORE_ExactMatchParamterFailed();
-    error BORG_CORE_MethodNotAuthorized();
-    error BORG_CORE_MethodCooldownActive();
-    error BORG_CORE_NativeCooldownActive();
-    
-    /// Events
-    event PolicyUpdated(address indexed contractAddress, string methodName, uint256 minValue, uint256 maxValue, bytes exactMatch, uint256 byteOffset, uint256 byteLength);
-    event PolicyCleared(address indexed contractAddress);
-    event PolicyRemoved(address indexed contractAddress, string methodName);
-    event RecipientAdded(address indexed recipient, uint256 transactionLimit);
-    event RecipientRemoved(address indexed recipient);
-    event ContractAdded(address indexed contractAddress);
-    event ContractRemoved(address indexed contractAddress);
-    event ParameterConstraintAdded(address indexed contractAddress, string methodName, uint8 paramIndex, ParamType paramType, uint256 minValue, uint256 maxValue, bytes exactMatch, uint256 byteOffset, uint256 byteLength);
-    event ParameterConstraintRemoved(address indexed contractAddress, string methodName, uint8 paramIndex);
-
     enum ParamType { UINT, ADDRESS, STRING, BYTES, BOOL, INT }
 
     struct ParamConstraint {
@@ -56,18 +49,40 @@ contract borgCore is BaseGuard, GlobalACL {
         mapping(bytes4 => MethodConstraint) methods;
     }
 
-    mapping(address => PolicyItem) public policy;
-    uint256 public nativeCooldown = 0;
-    uint256 public lastNativeExecutionTimestamp = 0;
-
     /// Whitelist Structs
     struct Recipient {
         bool approved;
         uint256 transactionLimit;
     }
 
+    uint256 public nativeCooldown = 0;
+    uint256 public lastNativeExecutionTimestamp = 0;
+
     /// Whitelist Mappings
     mapping(address => Recipient) public whitelistedRecipients;
+
+    mapping(address => PolicyItem) public policy;
+
+    /// Events
+    event PolicyUpdated(address indexed contractAddress, string methodName, uint256 minValue, uint256 maxValue, bytes exactMatch, uint256 byteOffset, uint256 byteLength);
+    event PolicyCleared(address indexed contractAddress);
+    event PolicyRemoved(address indexed contractAddress, string methodName);
+    event RecipientAdded(address indexed recipient, uint256 transactionLimit);
+    event RecipientRemoved(address indexed recipient);
+    event ContractAdded(address indexed contractAddress);
+    event ContractRemoved(address indexed contractAddress);
+    event ParameterConstraintAdded(address indexed contractAddress, string methodName, uint8 paramIndex, ParamType paramType, uint256 minValue, uint256 maxValue, bytes exactMatch, uint256 byteOffset, uint256 byteLength);
+    event ParameterConstraintRemoved(address indexed contractAddress, string methodName, uint8 paramIndex);
+
+    /// Errors
+    error BORG_CORE_InvalidRecipient();
+    error BORG_CORE_InvalidContract();
+    error BORG_CORE_AmountOverLimit();
+    error BORG_CORE_ArraysDoNotMatch();
+    error BORG_CORE_ExactMatchParamterFailed();
+    error BORG_CORE_MethodNotAuthorized();
+    error BORG_CORE_MethodCooldownActive();
+    error BORG_CORE_NativeCooldownActive();
 
     /// Constructor
     /// @param _auth Address, ideally an oversight multisig or other safeguard.
@@ -103,7 +118,7 @@ contract borgCore is BaseGuard, GlobalACL {
                 revert BORG_CORE_AmountOverLimit();
             }
             //check cooldown
-            if (!checkNativeCooldown()) {
+            if (!_checkNativeCooldown()) {
                 revert BORG_CORE_NativeCooldownActive();
             }
             lastNativeExecutionTimestamp = block.timestamp;
@@ -115,7 +130,7 @@ contract borgCore is BaseGuard, GlobalACL {
                 if(!isMethodCallAllowed(to, data))
                     revert BORG_CORE_MethodNotAuthorized();
             //Check Cooldown
-            if (!checkCooldown(to, bytes4(data[:4]))) {
+            if (!_checkCooldown(to, bytes4(data[:4]))) {
                 revert BORG_CORE_MethodCooldownActive();
             }
             //Update last executed time
@@ -126,34 +141,34 @@ contract borgCore is BaseGuard, GlobalACL {
          }
     }
 
-    // @dev This is post transaction execution. We can react but cannot revert what just occured.
+    /// @dev This is post transaction execution. We can react but cannot revert what just occured.
     function checkAfterExecution(bytes32 txHash, bool success) external view override {
      
     }
 
-    // @dev add recipient address and transaction limit to the whitelist
+    /// @dev add recipient address and transaction limit to the whitelist
     function addRecipient(address _recipient, uint256 _transactionLimit) external onlyOwner {
         whitelistedRecipients[_recipient] = Recipient(true, _transactionLimit);
     }
 
-    // @dev remove recipient address from the whitelist
+    /// @dev remove recipient address from the whitelist
     function removeRecipient(address _recipient) external onlyOwner {
         whitelistedRecipients[_recipient] = Recipient(false, 0);
     }
 
-    //@dev add contract address and transaction limit to the whitelist
+    /// @dev add contract address and transaction limit to the whitelist
     function addContract(address _contract) external onlyOwner {
        policy[_contract].allowed = true;
        policy[_contract].fullAccess = true;
     }
 
-    // @dev remove contract address from the whitelist
+    /// @dev remove contract address from the whitelist
     function removeContract(address _contract) external onlyOwner {
        policy[_contract].allowed = false;
        policy[_contract].fullAccess = false;
     }
 
-    // @dev to maintain erc165 compatiblity for the Gnosis Safe Guard Manager
+    /// @dev to maintain erc165 compatiblity for the Gnosis Safe Guard Manager
     function supportsInterface(bytes4 interfaceId) external view virtual override returns (bool) {
         return
             interfaceId == type(Guard).interfaceId || 
@@ -221,7 +236,7 @@ contract borgCore is BaseGuard, GlobalACL {
         policy[_contract].fullAccess = false;
     }
 
-        // Function to add a parameter constraint for uint256 with range
+    // Function to add a parameter constraint for uint256 with range
     function addSignedRangeParameterConstraint(
         address _contract,
         string memory _methodSignature,
@@ -262,41 +277,6 @@ contract borgCore is BaseGuard, GlobalACL {
         _addParameterConstraint(_contract, _methodSignature, _paramType,  0, 0, 0, 0, _exactMatch, _byteOffset, _byteLength);
     }
 
-      // Internal function to add a parameter constraint
-    function _addParameterConstraint(
-        address _contract,
-        string memory _methodSignature,
-        ParamType _paramType,
-        uint256 _minValue,
-        uint256 _maxValue,
-        int256 _iminValue,
-        int256 _imaxValue,
-        bytes32[] memory _exactMatch,
-        uint256 _byteOffset,
-        uint256 _byteLength
-    ) internal {
-        bytes4 methodSelector = bytes4(keccak256(bytes(_methodSignature)));
-
-        policy[_contract].methods[methodSelector].parameterConstraints[_byteOffset] = ParamConstraint({
-            exists: true,
-            paramType: _paramType,
-            minValue: _minValue,
-            maxValue: _maxValue,
-            iminValue: _iminValue,
-            imaxValue: _imaxValue,
-            exactMatch: _exactMatch,
-            byteLength: _byteLength
-        });
-
-        policy[_contract].allowed = true;
-        policy[_contract].fullAccess = false;
-         //set method allowed to true
-        policy[_contract].methods[methodSelector].allowed = true;
-        //update the offsets array
-        policy[_contract].methods[methodSelector].paramOffsets.push(_byteOffset);
-
-    }
-
     function updateNativeCooldown(uint256 _cooldownPeriod) public onlyOwner {
         nativeCooldown = _cooldownPeriod;
         lastNativeExecutionTimestamp = block.timestamp;
@@ -335,7 +315,7 @@ contract borgCore is BaseGuard, GlobalACL {
         //update the currentConstraints counter
     }
 
-     // Adjusted function to check if a method call is allowed using abi.decode
+    // Adjusted function to check if a method call is allowed using abi.decode
     function isMethodCallAllowed(
         address _contract,
         bytes calldata _methodCallData
@@ -385,8 +365,43 @@ contract borgCore is BaseGuard, GlobalACL {
         return true;
     }
 
+    // Internal function to add a parameter constraint
+    function _addParameterConstraint(
+        address _contract,
+        string memory _methodSignature,
+        ParamType _paramType,
+        uint256 _minValue,
+        uint256 _maxValue,
+        int256 _iminValue,
+        int256 _imaxValue,
+        bytes32[] memory _exactMatch,
+        uint256 _byteOffset,
+        uint256 _byteLength
+    ) internal {
+        bytes4 methodSelector = bytes4(keccak256(bytes(_methodSignature)));
+
+        policy[_contract].methods[methodSelector].parameterConstraints[_byteOffset] = ParamConstraint({
+            exists: true,
+            paramType: _paramType,
+            minValue: _minValue,
+            maxValue: _maxValue,
+            iminValue: _iminValue,
+            imaxValue: _imaxValue,
+            exactMatch: _exactMatch,
+            byteLength: _byteLength
+        });
+
+        policy[_contract].allowed = true;
+        policy[_contract].fullAccess = false;
+        //set method allowed to true
+        policy[_contract].methods[methodSelector].allowed = true;
+        //update the offsets array
+        policy[_contract].methods[methodSelector].paramOffsets.push(_byteOffset);
+
+    }
+
     // Cooldown check
-    function checkCooldown(address _contract, bytes4 _methodSelector) internal returns (bool) {
+    function _checkCooldown(address _contract, bytes4 _methodSelector) internal returns (bool) {
         MethodConstraint storage methodConstraint = policy[_contract].methods[_methodSelector];
         if (methodConstraint.cooldownPeriod == 0) {
             return true;
@@ -397,7 +412,7 @@ contract borgCore is BaseGuard, GlobalACL {
         return true;
     }
 
-    function checkNativeCooldown() internal returns (bool) {
+    function _checkNativeCooldown() internal returns (bool) {
         if (nativeCooldown == 0) {
             return true;
         }
@@ -407,4 +422,3 @@ contract borgCore is BaseGuard, GlobalACL {
         return true;
     }
 }
-
