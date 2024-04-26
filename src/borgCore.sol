@@ -13,7 +13,7 @@
 
 pragma solidity ^0.8.19;
 
-import "safe-contracts/base/GuardManager.sol";
+import "./baseGuard.sol";
 import "./libs/auth.sol";
 import "./interfaces/IERC4824.sol";
 

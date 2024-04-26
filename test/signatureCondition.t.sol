@@ -202,7 +202,7 @@ function testSign_AllSigners_AndLogic() public {
 
     function testThresholdExceedsSigners() public {
         try new SignatureCondition(signers, 4, SignatureCondition.Logic.AND) {
-            fail("Should revert due to threshold exceeding number of signers");
+            fail();
         } catch (bytes memory) {
             // Expected revert
         }
