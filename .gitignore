@@ -1,6 +1,5 @@
 cache/
 out/
 .env
-lib/
 test-command.txt
-test-command.txt
+

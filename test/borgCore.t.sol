@@ -45,6 +45,7 @@ contract ProjectTest is Test {
     auth = new Auth();
     safe = IGnosisSafe(MULTISIG);
     core = new borgCore(auth, 0x1);
+    
     failSafe = new failSafeImplant(auth, address(safe), dao);
     eject = new ejectImplant(auth, MULTISIG, address(failSafe));
 
