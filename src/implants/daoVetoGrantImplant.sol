@@ -2,34 +2,48 @@
 pragma solidity 0.8.20;
 
 import "../interfaces/ISafe.sol";
-import "../libs/auth.sol";
-import "forge-std/interfaces/IERC20.sol";
 import "../interfaces/IGovernanceAdapter.sol";
+import "forge-std/interfaces/IERC20.sol";
+
+import "../libs/auth.sol";
+
+import "./vetoImplant.sol";
 import "metavest/MetaVesTController.sol";
-import "./baseImplant.sol";
 
 /// @title daoVetoGrantImplan
 /// @notice This implant allows the BORG to grant time locked grants, vetoable by the DAO or authority.
-contract daoVetoGrantImplant is BaseImplant { //is baseImplant
+contract daoVetoGrantImplant is vetoImplant {
 
     // BORG Implant ID
-    uint256 public immutable IMPLANT_ID = 3;
+    uint256 public constant IMPLANT_ID = 3;
 
     // Governance Vars
     uint256 public lastProposalId;
     address public governanceAdapter;
-    address public governanceExecutor;
 
     // MetaVest Vars
     MetaVesT public metaVesT;
     MetaVesTController public metaVesTController;
 
     // Proposal Vars
+    /// @notice The duration of the DAO veto period
     uint256 public duration = 3 days; //3 days
+    /// @notice Quorum percentage used for veto votes
     uint256 public quorum = 3; //3%
+    /// @notice The percentage of votes in favor of the proposal required for it
+    ///         to pass
     uint256 public threshold = 25; //25%
-    uint256 public waitingPeriod = 24 hours;
+    /// @notice Minimum time between proposals being created
+    uint256 public cooldown = 24 hours;
+    /// @notice A period of time between an associated veto vote ending and the 
+    ///         proposal being executable by a BORG member to allow for the 
+    ///         veto to be executed by the DAO
+    uint256 public gracePeriod = 8 hours;
+    /// @notice The timestamp that the most recent proposal was created
     uint256 public lastProposalTime;
+    /// @notice Whether or not the BORG must vote to create a proposal. If this
+    ///         is set to false, BORG members can create proposals without the
+    ///         multisig threshold requirement
     bool public requireBorgVote = true;
 
     // Grant Proposal Struct
@@ -53,9 +67,8 @@ contract daoVetoGrantImplant is BaseImplant { //is baseImplant
     error daoVetoGrantImplant_CallerNotBORGMember();
     error daoVetoGrantImplant_CallerNotBORG();
     error daoVetoGrantImplant_GrantSpendingLimitReached();
-    error daoVetoGrantImplant_CallerNotGovernance();
     error daoVetoGrantImplant_InvalidToken();
-    error daoVetoGrantImplant_ProposalWaitingPeriodActive();
+    error daoVetoGrantImplant_ProposalCooldownActive();
     error daoVetoGrantImplant_ProposalNotReady();
     error daoVetoGrantImplant_ProposalExecutionError();
     error daoVetoGrantImplant_ProposalNotFound();
@@ -65,7 +78,7 @@ contract daoVetoGrantImplant is BaseImplant { //is baseImplant
 
     event GrantTokenAdded(address indexed token, uint256 spendingLimit);
     event GrantTokenRemoved(address indexed token);
-    event WaitingPeriodUpdated(uint256 newWaitingPeriod);
+    event CooldownUpdated(uint256 newCooldown);
     event DurationUpdated(uint256 newDuration);
     event QuorumUpdated(uint256 newQuorum);
     event ThresholdUpdated(uint256 newThreshold);
@@ -94,14 +107,14 @@ contract daoVetoGrantImplant is BaseImplant { //is baseImplant
     /// @param _duration The duration of the proposal
     /// @param _quorum The quorum required for the proposal
     /// @param _threshold The threshold required for the proposal
-    /// @param _waitingPeriod The waiting period required for the proposal
+    /// @param _cooldown The waiting period required for the proposal
     /// @param _governanceAdapter The governance adapter address
     /// @param _governanceExecutor The governance executor address
-    constructor(BorgAuth _auth, address _borgSafe, uint256 _duration, uint256 _quorum, uint256 _threshold, uint256 _waitingPeriod, address _governanceAdapter, address _governanceExecutor,address _metaVestController) BaseImplant(_auth, _borgSafe) {
+    constructor(BorgAuth _auth, address _borgSafe, uint256 _duration, uint256 _quorum, uint256 _threshold, uint256 _cooldown, address _governanceAdapter, address _governanceExecutor,address _metaVestController) BaseImplant(_auth, _borgSafe) {
         duration = _duration;
         quorum = _quorum;
         threshold = _threshold;
-        waitingPeriod = _waitingPeriod;
+        cooldown = _cooldown;
         lastProposalId=0;
         governanceAdapter = _governanceAdapter;
         governanceExecutor = _governanceExecutor;
@@ -125,10 +138,10 @@ contract daoVetoGrantImplant is BaseImplant { //is baseImplant
     }
 
     /// @notice Function to update the waiting period
-    /// @param _waitingPeriod The new waiting period
-    function updateWaitingPeriod(uint256 _waitingPeriod) external onlyOwner {
-        waitingPeriod = _waitingPeriod;
-        emit WaitingPeriodUpdated(_waitingPeriod);
+    /// @param _cooldown The new waiting period
+    function updateCooldown(uint256 _cooldown) external onlyOwner {
+        cooldown = _cooldown;
+        emit CooldownUpdated(_cooldown);
     }
 
     /// @notice Function to update the duration
@@ -170,7 +183,7 @@ contract daoVetoGrantImplant is BaseImplant { //is baseImplant
 
     /// @notice Internal function to delete a proposal
     /// @param _proposalId The proposal ID
-    function deleteProposal(uint256 _proposalId) public onlyThis {
+    function _deleteProposal(uint256 _proposalId) internal override {
         uint256 proposalIndex = proposalIndicesByProposalId[_proposalId];
         if(proposalIndex == 0) revert daoVetoGrantImplant_ProposalNotFound();
         uint256 lastProposalIndex = currentProposals.length - 1;
@@ -187,20 +200,20 @@ contract daoVetoGrantImplant is BaseImplant { //is baseImplant
     /// @dev Only callable by an active BORG member
     function executeProposal(uint256 _proposalId)
         external
-    {
+    {   
         if(!ISafe(BORG_SAFE).isOwner(msg.sender))
             revert daoVetoGrantImplant_CallerNotBORGMember();
 
         Proposal storage proposal = _getProposal(_proposalId);
 
-        if(proposal.startTime + proposal.duration > block.timestamp)
+        if(proposal.startTime + proposal.duration + gracePeriod > block.timestamp)
             revert daoVetoGrantImplant_ProposalNotReady();
 
         (bool success,) = address(this).call(proposal.cdata);
         if(!success)
             revert daoVetoGrantImplant_ProposalExecutionError();
 
-        deleteProposal(_proposalId);
+        _deleteProposal(_proposalId);
         emit ProposalExecuted(_proposalId);
     }
 
@@ -225,8 +238,8 @@ contract daoVetoGrantImplant is BaseImplant { //is baseImplant
         vetoProposalId = 0;
         newProposalId = 0;
 
-        if(lastProposalTime + waitingPeriod > block.timestamp)
-            revert daoVetoGrantImplant_ProposalWaitingPeriodActive();
+        if(lastProposalTime + cooldown > block.timestamp)
+            revert daoVetoGrantImplant_ProposalCooldownActive();
 
         if(IERC20(_token).balanceOf(address(BORG_SAFE)) < _amount || approvedGrantTokens[_token] < _amount)
             revert daoVetoGrantImplant_GrantSpendingLimitReached();
@@ -282,8 +295,8 @@ contract daoVetoGrantImplant is BaseImplant { //is baseImplant
         vetoProposalId = 0;
         newProposalId = 0;
 
-        if(lastProposalTime + waitingPeriod > block.timestamp)
-            revert daoVetoGrantImplant_ProposalWaitingPeriodActive();
+        if(lastProposalTime + cooldown > block.timestamp)
+            revert daoVetoGrantImplant_ProposalCooldownActive();
 
         if(IERC20(_token).balanceOf(address(BORG_SAFE)) < _amount || approvedGrantTokens[_token] < _amount)
             revert daoVetoGrantImplant_GrantSpendingLimitReached();
@@ -337,8 +350,8 @@ contract daoVetoGrantImplant is BaseImplant { //is baseImplant
         vetoProposalId = 0;
         newProposalId = 0;
         
-        if(lastProposalTime + waitingPeriod > block.timestamp)
-            revert daoVetoGrantImplant_ProposalWaitingPeriodActive();
+        if(lastProposalTime + cooldown > block.timestamp)
+            revert daoVetoGrantImplant_ProposalCooldownActive();
 
         uint256 _milestoneTotal;
         for (uint256 i; i < _metaVestDetails.milestones.length; ++i) {
