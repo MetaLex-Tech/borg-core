@@ -7,17 +7,17 @@ import "forge-std/interfaces/IERC20.sol";
 import "../libs/conditions/conditionManager.sol";
 import "metavest/MetaVesTController.sol";
 import "../interfaces/IGovernanceAdapter.sol";
-import "./baseImplant.sol";
+import "./VoteImplant.sol";
 
 /// @title daoVoteGrantImplant - A module for creating grants for a BORG with full DAO approval via governence.
 /// The DAO must have a valid governance system in place to use this module.
-contract daoVoteGrantImplant is BaseImplant {
+contract daoVoteGrantImplant is VoteImplant {
     // Implant ID
-    uint256 public immutable IMPLANT_ID = 4;
+    uint256 public constant IMPLANT_ID = 4;
 
     // Governance Vars
     address public governanceAdapter;
-    address public governanceExecutor;
+    // Also inherinting `governanceExecutor` from `VoteImplant`
 
     // MetaVest Vars
     MetaVesT public metaVesT;
@@ -31,19 +31,36 @@ contract daoVoteGrantImplant is BaseImplant {
     // Require BORG Vote (toggle multi-sig vote vs any BORG member)
     bool public requireBorgVote = true;
 
-    // Proposal Details Struct
-    struct proposalDetail {
+    /// @notice Struct to store a pending proposal that will later be executed
+    ///         by `executeProposal` following a successful governance vote.
+    struct ImplantProposal {
+        uint256 id;
+        uint256 duration;
+        uint256 startTime;
+        bytes cdata;
+    }
+
+    /// @notice Array of pending implant proposals
+    ImplantProposal[] public currentProposals;
+    mapping(uint256 => uint256) public proposalIndicesByProposalId;
+
+    /// @notice Governance Proposal Details Struct
+    struct governanceProposalDetail {
         address[] targets;
         uint256[] values;
         bytes[] proposalBytecodes;
         bytes32 desc;
     }
 
-    mapping(uint256 => proposalDetail) public proposalDetails;
+    /// @notice Mapping of governance proposal IDs to governance proposal details
+    mapping(uint256 => governanceProposalDetail) public governanceProposalDetails;
 
     // Events and Errors
     error daoVoteGrantImplant_NotAuthorized();
     error daoVoteGrantImplant_ProposalExpired();
+    error daoVoteGrantImplant_ProposalNotFound();
+    error daoVoteGrantImplant_ProposalNotReady();
+    error daoVoteGrantImplant_ProposalExecutionError();
     error daoVoteGrantImplant_GrantSpendingLimitReached();
     error daoVoteGrantImplant_CallerNotBORGMember();
     error daoVoteGrantImplant_CallerNotBORG();
@@ -58,13 +75,37 @@ contract daoVoteGrantImplant is BaseImplant {
         uint256 indexed proposalId, address indexed token, address indexed recipient, uint256 amount, string desc
     );
     event GrantProposalExecuted(address token, address recipient, uint256 amount, string desc);
+    event ProposalExecuted(uint256 _proposalId);
     event DurationUpdated(uint256 duration);
     event QuorumUpdated(uint256 quorum);
     event ThresholdUpdated(uint256 threshold);
     event GovernanceAdapterUpdated(address governanceAdapter);
-    event GovernanceExecutorUpdated(address governanceExecutor);
     event MetaVesTControllerUpdated(address metaVesTController);
     event BorgVoteToggled(bool requireBorgVote);
+
+    /// @notice Modifier to check caller is authorized to propose a grant. If
+    ///         `requireBorgVote` is true, then grants need to be co-approved by
+    ///         the threshold of borg members and be executed via the SAFE,
+    ///         otherwise the grant can be proposed directly by any BORG member.
+    modifier onlyGrantProposer() {
+        if (requireBorgVote) {
+            if (BORG_SAFE != msg.sender) {
+                revert daoVoteGrantImplant_CallerNotBORG();
+            }
+        } else if (BORG_SAFE != msg.sender) {
+            if (!ISafe(BORG_SAFE).isOwner(msg.sender)) {
+                revert daoVoteGrantImplant_CallerNotBORGMember();
+            }
+        }
+        _;
+    }
+
+    /// @notice Similar to declaring a function as `internal` but only works
+    ///         .call() from within this contract.
+    modifier onlyThis() {
+        if (msg.sender != address(this)) revert daoVetoGrantImplant_NotAuthorized();
+        _;
+    }
 
     /// @notice Constructor
     /// @param _auth - The BorgAuth contract address
@@ -122,13 +163,6 @@ contract daoVoteGrantImplant is BaseImplant {
         emit GovernanceAdapterUpdated(_governanceAdapter);
     }
 
-    /// @notice Update the governance executor contract address
-    /// @param _governanceExecutor - The new governance executor contract address
-    function setGovernanceExecutor(address _governanceExecutor) external onlyOwner {
-        governanceExecutor = _governanceExecutor;
-        emit GovernanceExecutorUpdated(_governanceExecutor);
-    }
-
     /// @notice Update the metavest controller contract address
     /// @param _metaVestController - The new metavest controller contract address
     function setMetaVestController(address _metaVestController) external onlyOwner {
@@ -144,51 +178,73 @@ contract daoVoteGrantImplant is BaseImplant {
         emit BorgVoteToggled(_requireBorgVote);
     }
 
-    /// @notice Propose a direct grant to a recipient, bypassing metavest with a direct erc20 transfer
-    /// @param _token - The token address to be given in the grant
-    /// @param _recipient - The recipient of the grant
-    /// @param _amount - The amount of tokens to be given
-    /// @param _desc - The description of the proposal
-    /// @return proposalId - The ID of the proposal created by the governance adapter, or 0 if there is none (should be manually created)
-    function proposeDirectGrant(address _token, address _recipient, uint256 _amount, string memory _desc)
-        external
-        returns (uint256 proposalId)
+    /// @notice Stores a proposal's calldata, startime and duration to be 
+    ///         executed later by `executeProposal`, which can only be called
+    ///         by the governance executor. Calldata will contain a call to one 
+    //          of the three different grant execution functions with args.
+    /// @param _cdata The calldata for the pending proposal
+    /// @return proposalId The ID of the pending proposal, which will be later
+    ///         passed to `executeProposal`.
+    function _createImplantProposal(bytes memory _cdata) internal returns (uint256 proposalId) {
+        Proposal storage newProposal = currentProposals.push();
+        newProposalId = ++lastProposalId;
+        newProposal.id = newProposalId;
+        newProposal.startTime = block.timestamp;
+        newProposal.cdata = _cdata;
+        newProposal.duration = duration;
+        proposalIndicesByProposalId[newProposalId] = currentProposals.length;
+        return newProposalId;
+    }
+
+    /// @notice If a governance adapter is configured, this function will create
+    ///         call the adapter to create a governance vote that will execute
+    ///         a pending proposal if successful. IF no governance adapter is
+    ///         configured, this function does nothing.
+    /// @param _proposalId The ID of the pending implant proposal
+    /// @return governanceProposalId The ID of the resultant governance proposal
+    ///         or 0 if no governance adapter is configured.
+    function _createGovernanceVoteToExecuteProposalById(uint256 _proposalId)
+        internal
+        returns (uint256 governanceProposalId)
     {
-        proposalId = 0;
-        if (IERC20(_token).balanceOf(address(BORG_SAFE)) < _amount) {
-            revert daoVoteGrantImplant_GrantSpendingLimitReached();
-        }
-
-        if (requireBorgVote) {
-            if (BORG_SAFE != msg.sender) {
-                revert daoVoteGrantImplant_CallerNotBORG();
-            }
-        } else if (BORG_SAFE != msg.sender) {
-            if (!ISafe(BORG_SAFE).isOwner(msg.sender)) {
-                revert daoVoteGrantImplant_CallerNotBORGMember();
-            }
-        }
-
         if (governanceAdapter != address(0)) {
-            bytes memory proposalBytecode =
-                abi.encodeWithSignature("executeDirectGrant(address,address,uint256)", _token, _recipient, _amount);
             address[] memory targets = new address[](1);
             targets[0] = address(this);
             uint256[] memory values = new uint256[](1);
             values[0] = 0;
             bytes[] memory proposalBytecodes = new bytes[](1);
-            proposalBytecodes[0] = proposalBytecode;
-            proposalId = IGovernanceAdapter(governanceAdapter).createProposal(
+            proposalBytecodes[0] = abi.encodeWithSignature("executeProposal(uint256)", _proposalId);
+            governanceProposalId = IGovernanceAdapter(governanceAdapter).createProposal(
                 targets, values, proposalBytecodes, _desc, quorum, threshold, duration
             );
-            proposalDetails[proposalId] =
-                proposalDetail(targets, values, proposalBytecodes, keccak256(abi.encodePacked(_desc)));
-            emit PendingProposalCreated(proposalId, proposalId);
+            governanceProposalDetails[governanceProposalId] =
+                governanceProposalDetail(targets, values, proposalBytecodes, keccak256(abi.encodePacked(_desc)));
         } else {
-            emit PendingProposalCreated(proposalId, 0);
+            // No onchain governance configured.
+            return 0;
+        }
+    }
+
+    /// @notice Propose a direct grant to a recipient, bypassing metavest with a direct erc20 transfer
+    /// @param _token - The token address to be given in the grant
+    /// @param _recipient - The recipient of the grant
+    /// @param _amount - The amount of tokens to be given
+    /// @param _desc - The description of the proposal
+    function proposeDirectGrant(address _token, address _recipient, uint256 _amount, string memory _desc)
+        external
+        onlyGrantProposer
+    {
+        if (IERC20(_token).balanceOf(address(BORG_SAFE)) < _amount) {
+            revert daoVoteGrantImplant_GrantSpendingLimitReached();
         }
 
-        emit GrantProposalCreated(proposalId, _token, _recipient, _amount, _desc);
+        bytes memory proposalBytecode =
+            abi.encodeWithSignature("executeDirectGrant(address,address,uint256)", _token, _recipient, _amount);
+        uint256 implantProposalId = _createImplantProposal(proposalBytecode);
+        uint256 governanceProposalId = _createGovernanceVoteToExecuteProposalById(implantProposalId);
+
+        emit PendingProposalCreated(implantProposalId, governanceProposalId);
+        emit GrantProposalCreated(implantProposalId, _token, _recipient, _amount, _desc);
     }
 
     /// @notice Propose a simple grant to a recipient, using metavest to transfer the tokens
@@ -196,57 +252,31 @@ contract daoVoteGrantImplant is BaseImplant {
     /// @param _recipient - The recipient of the grant
     /// @param _amount - The amount of tokens to be given
     /// @param _desc - The description of the proposal
-    /// @return proposalId - The ID of the proposal created by the governance adapter, or 0 if there is none (should be manually created)
     function proposeSimpleGrant(address _token, address _recipient, uint256 _amount, string memory _desc)
         external
-        returns (uint256 proposalId)
+        onlyGrantProposer
     {
-        proposalId = 0;
         if (IERC20(_token).balanceOf(address(BORG_SAFE)) < _amount) {
             revert daoVoteGrantImplant_GrantSpendingLimitReached();
         }
 
-        if (requireBorgVote) {
-            if (BORG_SAFE != msg.sender) {
-                revert daoVoteGrantImplant_CallerNotBORG();
-            }
-        } else if (BORG_SAFE != msg.sender) {
-            if (!ISafe(BORG_SAFE).isOwner(msg.sender)) {
-                revert daoVoteGrantImplant_CallerNotBORGMember();
-            }
-        }
+        bytes memory proposalBytecode =
+            abi.encodeWithSignature("executeSimpleGrant(address,address,uint256)", _token, _recipient, _amount);
 
-        if (governanceAdapter != address(0)) {
-            bytes memory proposalBytecode =
-                abi.encodeWithSignature("executeSimpleGrant(address,address,uint256)", _token, _recipient, _amount);
-            address[] memory targets = new address[](1);
-            targets[0] = address(this);
-            uint256[] memory values = new uint256[](1);
-            values[0] = 0;
-            bytes[] memory proposalBytecodes = new bytes[](1);
-            proposalBytecodes[0] = proposalBytecode;
-            proposalId = IGovernanceAdapter(governanceAdapter).createProposal(
-                targets, values, proposalBytecodes, _desc, quorum, threshold, duration
-            );
-            proposalDetails[proposalId] =
-                proposalDetail(targets, values, proposalBytecodes, keccak256(abi.encodePacked(_desc)));
-            emit PendingProposalCreated(proposalId, proposalId);
-        } else {
-            emit PendingProposalCreated(proposalId, 0);
-        }
+        uint256 implantProposalId = _createImplantProposal(proposalBytecode);
+        uint256 governanceProposalId = _createGovernanceVoteToExecuteProposalById(implantProposalId);
 
+        emit PendingProposalCreated(implantProposalId, governanceProposalId);
         emit GrantProposalCreated(proposalId, _token, _recipient, _amount, _desc);
     }
 
     /// @notice Propose an advanced grant to a recipient, using metavest to transfer the tokens
     /// @param _metaVestDetails - The metavest details for the grant
     /// @param _desc - The description of the proposal
-    /// @return proposalId - The ID of the proposal created by the governance adapter, or 0 if there is none (should be manually created)
     function proposeAdvancedGrant(MetaVesT.MetaVesTDetails calldata _metaVestDetails, string memory _desc)
         external
-        returns (uint256 proposalId)
+        onlyGrantProposer
     {
-        proposalId = 0;
         uint256 _milestoneTotal;
         for (uint256 i; i < _metaVestDetails.milestones.length; ++i) {
             _milestoneTotal += _metaVestDetails.milestones[i].milestoneAward;
@@ -257,51 +287,66 @@ contract daoVoteGrantImplant is BaseImplant {
             revert daoVoteGrantImplant_GrantSpendingLimitReached();
         }
 
-        if (requireBorgVote) {
-            if (BORG_SAFE != msg.sender) {
-                revert daoVoteGrantImplant_CallerNotBORG();
-            }
-        } else if (BORG_SAFE != msg.sender) {
-            if (!ISafe(BORG_SAFE).isOwner(msg.sender)) {
-                revert daoVoteGrantImplant_CallerNotBORGMember();
-            }
-        }
+        bytes memory proposalBytecode = abi.encodeWithSignature(
+            "executeAdvancedGrant((address,bool,uint8,(uint256,uint256,uint256,uint256,uint256,uint256,uint128,uint128,uint160,uint48,uint48,uint160,uint48,uint48,address),(uint256,uint208,uint48),(uint256,uint208,uint48),(bool,bool,bool),(uint256,bool,address[])[]))",
+            _metaVestDetails
+        );
 
-        if (governanceAdapter != address(0)) {
-            bytes memory proposalBytecode = abi.encodeWithSignature(
-                "createMetavestAndLockTokens((address,bool,uint8,(uint256,uint256,uint256,uint256,uint256,uint256,uint128,uint128,uint160,uint48,uint48,uint160,uint48,uint48,address),(uint256,uint208,uint48),(uint256,uint208,uint48),(bool,bool,bool),(uint256,bool,address[])[]))",
-                _metaVestDetails
-            );
-            address[] memory targets = new address[](1);
-            targets[0] = address(this);
-            uint256[] memory values = new uint256[](1);
-            values[0] = 0;
-            bytes[] memory proposalBytecodes = new bytes[](1);
-            proposalBytecodes[0] = proposalBytecode;
-            proposalId = IGovernanceAdapter(governanceAdapter).createProposal(
-                targets, values, proposalBytecodes, _desc, quorum, threshold, duration
-            );
-            proposalDetails[proposalId] =
-                proposalDetail(targets, values, proposalBytecodes, keccak256(abi.encodePacked(_desc)));
-            emit PendingProposalCreated(proposalId, proposalId);
-        } else {
-            emit PendingProposalCreated(proposalId, 0);
-        }
+        uint256 implantProposalId = _createImplantProposal(proposalBytecode);
+        uint256 governanceProposalId = _createGovernanceVoteToExecuteProposalById(implantProposalId);
 
+        emit PendingProposalCreated(implantProposalId, governanceProposalId);
         emit GrantProposalCreated(
             proposalId, _metaVestDetails.allocation.tokenContract, _metaVestDetails.grantee, _total, _desc
         );
     }
 
-    /// @notice Execute a proposal a direct grant, only callable by the governance executor
+    /// @notice Internal View function to get a proposal
+    /// @param _proposalId The proposal ID
+    /// @return Proposal The proposal struct
+    function _getProposal(uint256 _proposalId) internal view returns (Proposal memory) {
+        uint256 proposalIndex = proposalIndicesByProposalId[_proposalId];
+        if (proposalIndex == 0) revert daoVoteGrantImplant_ProposalNotFound();
+        return currentProposals[proposalIndex - 1];
+    }
+
+    /// @notice Proposal called by governance executor to execute a pending
+    ///         proposal.
+    /// @param _proposalId The ID of the pending implant proposal
+    function executeProposal(uint256 _proposalId) external onlyGovernance {
+        ImplantProposal memory proposal = _getProposal(_proposalId);
+        
+        if (proposal.startTime + proposal.duration > block.timestamp)
+            revert daoVoteGrantImplant_ProposalNotReady();
+            
+        (bool success,) = address(this).call(proposal.cdata);
+        if(!success)
+            revert daoVoteGrantImplant_ProposalExecutionError();
+            
+        _deleteProposal(_proposalId);
+        emit ProposalExecuted(_proposalId);
+    }
+
+    /// @notice Internal function to delete a proposal
+    /// @param _proposalId The proposal ID
+    function _deleteProposal(uint256 _proposalId) internal override {
+        uint256 proposalIndex = proposalIndicesByProposalId[_proposalId];
+        if (proposalIndex == 0) revert daoVoteGrantImplant_ProposalNotFound();
+        uint256 lastProposalIndex = currentProposals.length - 1;
+        if (proposalIndex - 1 != lastProposalIndex) {
+            currentProposals[proposalIndex - 1] = currentProposals[lastProposalIndex];
+            proposalIndicesByProposalId[currentProposals[lastProposalIndex].id] = proposalIndex;
+        }
+        currentProposals.pop();
+        delete proposalIndicesByProposalId[_proposalId];
+    }
+
+    /// @notice Execute a proposal a direct grant, only callable by internal `.call()`
+    ///         which will be done from within `executeProposal`.
     /// @param _token - The token address to be given in the grant
     /// @param _recipient - The recipient of the grant
     /// @param _amount - The amount of tokens to be given
-    function executeDirectGrant(address _token, address _recipient, uint256 _amount) external {
-        if (governanceExecutor != msg.sender) {
-            revert daoVoteGrantImplant_CallerNotGovernance();
-        }
-
+    function executeDirectGrant(address _token, address _recipient, uint256 _amount) onlyThis {
         if (IERC20(_token).balanceOf(address(BORG_SAFE)) < _amount) {
             revert daoVoteGrantImplant_GrantSpendingLimitReached();
         }
@@ -324,15 +369,12 @@ contract daoVoteGrantImplant is BaseImplant {
         emit GrantProposalExecuted(_token, _recipient, _amount, "");
     }
 
-    /// @notice Execute a proposal for a simple grant, only callable by the governance executor
+    /// @notice Execute a proposal for a simple grant, only callable by internal `.call()`
+    ///         which will be done from within `executeProposal`.
     /// @param _token - The token address to be given in the grant
     /// @param _recipient - The recipient of the grant
     /// @param _amount - The amount of tokens to be given
-    function executeSimpleGrant(address _token, address _recipient, uint256 _amount) external {
-        if (governanceExecutor != msg.sender) {
-            revert daoVoteGrantImplant_CallerNotGovernance();
-        }
-
+    function executeSimpleGrant(address _token, address _recipient, uint256 _amount) onlyThis {
         if (IERC20(_token).balanceOf(address(BORG_SAFE)) < _amount) {
             revert daoVoteGrantImplant_GrantSpendingLimitReached();
         }
@@ -393,13 +435,10 @@ contract daoVoteGrantImplant is BaseImplant {
         emit GrantProposalExecuted(_token, _recipient, _amount, "");
     }
 
-    /// @notice Execute a proposal for an advanced grant, only callable by the governance executor
+    /// @notice Execute a proposal for an advanced grant, only callable by internal `.call()`
+    ///         which will be done from within `executeProposal`.
     /// @param _metavestDetails - The metavest details for the grant
-    function executeAdvancedGrant(MetaVesT.MetaVesTDetails calldata _metavestDetails) external {
-        if (governanceExecutor != msg.sender) {
-            revert daoVoteGrantImplant_CallerNotGovernance();
-        }
-
+    function executeAdvancedGrant(MetaVesT.MetaVesTDetails calldata _metavestDetails) onlyThis {
         //cycle through any allocations and approve the metavest to spend the amount
         uint256 _milestoneTotal;
         for (uint256 i; i < _metavestDetails.milestones.length; ++i) {
@@ -436,8 +475,12 @@ contract daoVoteGrantImplant is BaseImplant {
 
     /// @notice Get the details of a proposal
     /// @param _proposalId - The ID of the proposal
-    /// @return proposalDetail - The details of the proposal
-    function getProposalDetails(uint256 _proposalId) external view returns (proposalDetail memory) {
-        return proposalDetails[_proposalId];
+    /// @return governanceProposalDetail - The details of the proposal
+    function getGovernanceProposalDetails(uint256 _governanceProposalId)
+        external
+        view
+        returns (governanceProposalDetail memory)
+    {
+        return governanceProposalDetails[_governanceProposalId];
     }
 }

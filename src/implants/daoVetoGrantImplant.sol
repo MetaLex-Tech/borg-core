@@ -212,7 +212,7 @@ contract daoVetoGrantImplant is vetoImplant {
         if(!ISafe(BORG_SAFE).isOwner(msg.sender))
             revert daoVetoGrantImplant_CallerNotBORGMember();
 
-        Proposal storage proposal = _getProposal(_proposalId);
+        Proposal memory proposal = _getProposal(_proposalId);
 
         if(proposal.startTime + proposal.duration + gracePeriod > block.timestamp)
             revert daoVetoGrantImplant_ProposalNotReady();
@@ -228,7 +228,7 @@ contract daoVetoGrantImplant is vetoImplant {
     /// @notice Internal View function to get a proposal
     /// @param _proposalId The proposal ID
     /// @return Proposal The proposal struct
-    function _getProposal(uint256 _proposalId) internal view returns (Proposal storage) {
+    function _getProposal(uint256 _proposalId) internal view returns (Proposal memory) {
         uint256 proposalIndex = proposalIndicesByProposalId[_proposalId];
         if(proposalIndex == 0) revert daoVetoGrantImplant_ProposalNotFound();
         return currentProposals[proposalIndex - 1];
