@@ -203,7 +203,7 @@ contract daoVoteGrantImplant is VoteImplant {
     /// @param _proposalId The ID of the pending implant proposal
     /// @return governanceProposalId The ID of the resultant governance proposal
     ///         or 0 if no governance adapter is configured.
-    function _createGovernanceVoteToExecuteProposalById(uint256 _proposalId)
+    function _createGovernanceVoteToExecuteProposalById(uint256 _proposalId, string memory _desc)
         internal
         returns (uint256 governanceProposalId)
     {
@@ -241,7 +241,7 @@ contract daoVoteGrantImplant is VoteImplant {
         bytes memory proposalBytecode =
             abi.encodeWithSignature("executeDirectGrant(address,address,uint256)", _token, _recipient, _amount);
         uint256 implantProposalId = _createImplantProposal(proposalBytecode);
-        uint256 governanceProposalId = _createGovernanceVoteToExecuteProposalById(implantProposalId);
+        uint256 governanceProposalId = _createGovernanceVoteToExecuteProposalById(implantProposalId, _desc);
 
         emit PendingProposalCreated(implantProposalId, governanceProposalId);
         emit GrantProposalCreated(implantProposalId, _token, _recipient, _amount, _desc);
@@ -264,7 +264,7 @@ contract daoVoteGrantImplant is VoteImplant {
             abi.encodeWithSignature("executeSimpleGrant(address,address,uint256)", _token, _recipient, _amount);
 
         uint256 implantProposalId = _createImplantProposal(proposalBytecode);
-        uint256 governanceProposalId = _createGovernanceVoteToExecuteProposalById(implantProposalId);
+        uint256 governanceProposalId = _createGovernanceVoteToExecuteProposalById(implantProposalId, _desc);
 
         emit PendingProposalCreated(implantProposalId, governanceProposalId);
         emit GrantProposalCreated(proposalId, _token, _recipient, _amount, _desc);
@@ -293,7 +293,7 @@ contract daoVoteGrantImplant is VoteImplant {
         );
 
         uint256 implantProposalId = _createImplantProposal(proposalBytecode);
-        uint256 governanceProposalId = _createGovernanceVoteToExecuteProposalById(implantProposalId);
+        uint256 governanceProposalId = _createGovernanceVoteToExecuteProposalById(implantProposalId, _desc);
 
         emit PendingProposalCreated(implantProposalId, governanceProposalId);
         emit GrantProposalCreated(
