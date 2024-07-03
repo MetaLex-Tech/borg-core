@@ -79,6 +79,7 @@ contract daoVetoGrantImplant is vetoImplant {
     event GrantTokenAdded(address indexed token, uint256 spendingLimit);
     event GrantTokenRemoved(address indexed token);
     event CooldownUpdated(uint256 newCooldown);
+    event GracePeriodUpdated(uint256 newGracePeriod);
     event DurationUpdated(uint256 newDuration);
     event QuorumUpdated(uint256 newQuorum);
     event ThresholdUpdated(uint256 newThreshold);
@@ -142,6 +143,13 @@ contract daoVetoGrantImplant is vetoImplant {
     function updateCooldown(uint256 _cooldown) external onlyOwner {
         cooldown = _cooldown;
         emit CooldownUpdated(_cooldown);
+    }
+    
+    /// @notice Function to update the grace period
+    /// @param _gracePeriod The new grace period
+    function updateGracePeriod(uint256 _gracePeriod) external onlyOwner {
+        gracePeriod = _gracePeriod;
+        emit GracePeriodUpdated(_gracePeriod);
     }
 
     /// @notice Function to update the duration

@@ -26,7 +26,7 @@ abstract contract vetoImplant is BaseImplant, IVetoImplant {
 
     /// @notice Internal function to delete a proposal
     /// @param _proposalId The proposal ID
-    /// @dev Will eithere be called by goevernance executor or internally
+    /// @dev Will either be called by goevernance executor or internally
     ///      following the successful execution of a proposal
     function _deleteProposal(uint256 _proposalId) internal virtual;
 }
