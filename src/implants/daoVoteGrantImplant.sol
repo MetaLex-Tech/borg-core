@@ -14,6 +14,7 @@ import "./VoteImplant.sol";
 contract daoVoteGrantImplant is VoteImplant {
     // Implant ID
     uint256 public constant IMPLANT_ID = 4;
+    uint256 public lastProposalId = 0;
 
     // Governance Vars
     address public governanceAdapter;
@@ -103,7 +104,7 @@ contract daoVoteGrantImplant is VoteImplant {
     /// @notice Similar to declaring a function as `internal` but only works
     ///         .call() from within this contract.
     modifier onlyThis() {
-        if (msg.sender != address(this)) revert daoVetoGrantImplant_NotAuthorized();
+        if (msg.sender != address(this)) revert daoVoteGrantImplant_NotAuthorized();
         _;
     }
 
@@ -186,14 +187,13 @@ contract daoVoteGrantImplant is VoteImplant {
     /// @return proposalId The ID of the pending proposal, which will be later
     ///         passed to `executeProposal`.
     function _createImplantProposal(bytes memory _cdata) internal returns (uint256 proposalId) {
-        Proposal storage newProposal = currentProposals.push();
-        newProposalId = ++lastProposalId;
-        newProposal.id = newProposalId;
+        ImplantProposal storage newProposal = currentProposals.push();
+        proposalId = ++lastProposalId;
+        newProposal.id = proposalId;
         newProposal.startTime = block.timestamp;
         newProposal.cdata = _cdata;
         newProposal.duration = duration;
-        proposalIndicesByProposalId[newProposalId] = currentProposals.length;
-        return newProposalId;
+        proposalIndicesByProposalId[proposalId] = currentProposals.length;
     }
 
     /// @notice If a governance adapter is configured, this function will create
@@ -267,7 +267,7 @@ contract daoVoteGrantImplant is VoteImplant {
         uint256 governanceProposalId = _createGovernanceVoteToExecuteProposalById(implantProposalId, _desc);
 
         emit PendingProposalCreated(implantProposalId, governanceProposalId);
-        emit GrantProposalCreated(proposalId, _token, _recipient, _amount, _desc);
+        emit GrantProposalCreated(implantProposalId, _token, _recipient, _amount, _desc);
     }
 
     /// @notice Propose an advanced grant to a recipient, using metavest to transfer the tokens
@@ -297,14 +297,14 @@ contract daoVoteGrantImplant is VoteImplant {
 
         emit PendingProposalCreated(implantProposalId, governanceProposalId);
         emit GrantProposalCreated(
-            proposalId, _metaVestDetails.allocation.tokenContract, _metaVestDetails.grantee, _total, _desc
+            implantProposalId, _metaVestDetails.allocation.tokenContract, _metaVestDetails.grantee, _total, _desc
         );
     }
 
     /// @notice Internal View function to get a proposal
     /// @param _proposalId The proposal ID
-    /// @return Proposal The proposal struct
-    function _getProposal(uint256 _proposalId) internal view returns (Proposal memory) {
+    /// @return ImplantProposal The proposal struct
+    function _getProposal(uint256 _proposalId) internal view returns (ImplantProposal memory) {
         uint256 proposalIndex = proposalIndicesByProposalId[_proposalId];
         if (proposalIndex == 0) revert daoVoteGrantImplant_ProposalNotFound();
         return currentProposals[proposalIndex - 1];
@@ -346,7 +346,7 @@ contract daoVoteGrantImplant is VoteImplant {
     /// @param _token - The token address to be given in the grant
     /// @param _recipient - The recipient of the grant
     /// @param _amount - The amount of tokens to be given
-    function executeDirectGrant(address _token, address _recipient, uint256 _amount) onlyThis {
+    function executeDirectGrant(address _token, address _recipient, uint256 _amount) onlyThis external {
         if (IERC20(_token).balanceOf(address(BORG_SAFE)) < _amount) {
             revert daoVoteGrantImplant_GrantSpendingLimitReached();
         }
@@ -374,7 +374,7 @@ contract daoVoteGrantImplant is VoteImplant {
     /// @param _token - The token address to be given in the grant
     /// @param _recipient - The recipient of the grant
     /// @param _amount - The amount of tokens to be given
-    function executeSimpleGrant(address _token, address _recipient, uint256 _amount) onlyThis {
+    function executeSimpleGrant(address _token, address _recipient, uint256 _amount) onlyThis external {
         if (IERC20(_token).balanceOf(address(BORG_SAFE)) < _amount) {
             revert daoVoteGrantImplant_GrantSpendingLimitReached();
         }
@@ -438,7 +438,7 @@ contract daoVoteGrantImplant is VoteImplant {
     /// @notice Execute a proposal for an advanced grant, only callable by internal `.call()`
     ///         which will be done from within `executeProposal`.
     /// @param _metavestDetails - The metavest details for the grant
-    function executeAdvancedGrant(MetaVesT.MetaVesTDetails calldata _metavestDetails) onlyThis {
+    function executeAdvancedGrant(MetaVesT.MetaVesTDetails calldata _metavestDetails) onlyThis external {
         //cycle through any allocations and approve the metavest to spend the amount
         uint256 _milestoneTotal;
         for (uint256 i; i < _metavestDetails.milestones.length; ++i) {
@@ -474,7 +474,7 @@ contract daoVoteGrantImplant is VoteImplant {
     }
 
     /// @notice Get the details of a proposal
-    /// @param _proposalId - The ID of the proposal
+    /// @param _governanceProposalId - The ID of the proposal
     /// @return governanceProposalDetail - The details of the proposal
     function getGovernanceProposalDetails(uint256 _governanceProposalId)
         external
