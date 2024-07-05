@@ -179,9 +179,9 @@ contract daoVoteGrantImplant is VoteImplant {
         emit BorgVoteToggled(_requireBorgVote);
     }
 
-    /// @notice Stores a proposal's calldata, startime and duration to be 
+    /// @notice Stores a proposal's calldata, startime and duration to be
     ///         executed later by `executeProposal`, which can only be called
-    ///         by the governance executor. Calldata will contain a call to one 
+    ///         by the governance executor. Calldata will contain a call to one
     //          of the three different grant execution functions with args.
     /// @param _cdata The calldata for the pending proposal
     /// @return proposalId The ID of the pending proposal, which will be later
@@ -233,6 +233,7 @@ contract daoVoteGrantImplant is VoteImplant {
     function proposeDirectGrant(address _token, address _recipient, uint256 _amount, string memory _desc)
         external
         onlyGrantProposer
+        returns (uint256 implantProposalId)
     {
         if (IERC20(_token).balanceOf(address(BORG_SAFE)) < _amount) {
             revert daoVoteGrantImplant_GrantSpendingLimitReached();
@@ -240,7 +241,7 @@ contract daoVoteGrantImplant is VoteImplant {
 
         bytes memory proposalBytecode =
             abi.encodeWithSignature("executeDirectGrant(address,address,uint256)", _token, _recipient, _amount);
-        uint256 implantProposalId = _createImplantProposal(proposalBytecode);
+        implantProposalId = _createImplantProposal(proposalBytecode);
         uint256 governanceProposalId = _createGovernanceVoteToExecuteProposalById(implantProposalId, _desc);
 
         emit PendingProposalCreated(implantProposalId, governanceProposalId);
@@ -255,6 +256,7 @@ contract daoVoteGrantImplant is VoteImplant {
     function proposeSimpleGrant(address _token, address _recipient, uint256 _amount, string memory _desc)
         external
         onlyGrantProposer
+        returns (uint256 implantProposalId)
     {
         if (IERC20(_token).balanceOf(address(BORG_SAFE)) < _amount) {
             revert daoVoteGrantImplant_GrantSpendingLimitReached();
@@ -263,7 +265,7 @@ contract daoVoteGrantImplant is VoteImplant {
         bytes memory proposalBytecode =
             abi.encodeWithSignature("executeSimpleGrant(address,address,uint256)", _token, _recipient, _amount);
 
-        uint256 implantProposalId = _createImplantProposal(proposalBytecode);
+        implantProposalId = _createImplantProposal(proposalBytecode);
         uint256 governanceProposalId = _createGovernanceVoteToExecuteProposalById(implantProposalId, _desc);
 
         emit PendingProposalCreated(implantProposalId, governanceProposalId);
@@ -276,6 +278,7 @@ contract daoVoteGrantImplant is VoteImplant {
     function proposeAdvancedGrant(MetaVesT.MetaVesTDetails calldata _metaVestDetails, string memory _desc)
         external
         onlyGrantProposer
+        returns (uint256 implantProposalId)
     {
         uint256 _milestoneTotal;
         for (uint256 i; i < _metaVestDetails.milestones.length; ++i) {
@@ -292,7 +295,7 @@ contract daoVoteGrantImplant is VoteImplant {
             _metaVestDetails
         );
 
-        uint256 implantProposalId = _createImplantProposal(proposalBytecode);
+        implantProposalId = _createImplantProposal(proposalBytecode);
         uint256 governanceProposalId = _createGovernanceVoteToExecuteProposalById(implantProposalId, _desc);
 
         emit PendingProposalCreated(implantProposalId, governanceProposalId);
@@ -315,14 +318,16 @@ contract daoVoteGrantImplant is VoteImplant {
     /// @param _proposalId The ID of the pending implant proposal
     function executeProposal(uint256 _proposalId) external onlyGovernance {
         ImplantProposal memory proposal = _getProposal(_proposalId);
-        
-        if (proposal.startTime + proposal.duration > block.timestamp)
+
+        if (proposal.startTime + proposal.duration > block.timestamp) {
             revert daoVoteGrantImplant_ProposalNotReady();
-            
+        }
+
         (bool success,) = address(this).call(proposal.cdata);
-        if(!success)
+        if (!success) {
             revert daoVoteGrantImplant_ProposalExecutionError();
-            
+        }
+
         _deleteProposal(_proposalId);
         emit ProposalExecuted(_proposalId);
     }
@@ -346,7 +351,7 @@ contract daoVoteGrantImplant is VoteImplant {
     /// @param _token - The token address to be given in the grant
     /// @param _recipient - The recipient of the grant
     /// @param _amount - The amount of tokens to be given
-    function executeDirectGrant(address _token, address _recipient, uint256 _amount) onlyThis external {
+    function executeDirectGrant(address _token, address _recipient, uint256 _amount) external onlyThis {
         if (IERC20(_token).balanceOf(address(BORG_SAFE)) < _amount) {
             revert daoVoteGrantImplant_GrantSpendingLimitReached();
         }
@@ -374,7 +379,7 @@ contract daoVoteGrantImplant is VoteImplant {
     /// @param _token - The token address to be given in the grant
     /// @param _recipient - The recipient of the grant
     /// @param _amount - The amount of tokens to be given
-    function executeSimpleGrant(address _token, address _recipient, uint256 _amount) onlyThis external {
+    function executeSimpleGrant(address _token, address _recipient, uint256 _amount) external onlyThis {
         if (IERC20(_token).balanceOf(address(BORG_SAFE)) < _amount) {
             revert daoVoteGrantImplant_GrantSpendingLimitReached();
         }
@@ -438,7 +443,7 @@ contract daoVoteGrantImplant is VoteImplant {
     /// @notice Execute a proposal for an advanced grant, only callable by internal `.call()`
     ///         which will be done from within `executeProposal`.
     /// @param _metavestDetails - The metavest details for the grant
-    function executeAdvancedGrant(MetaVesT.MetaVesTDetails calldata _metavestDetails) onlyThis external {
+    function executeAdvancedGrant(MetaVesT.MetaVesTDetails calldata _metavestDetails) external onlyThis {
         //cycle through any allocations and approve the metavest to spend the amount
         uint256 _milestoneTotal;
         for (uint256 i; i < _metavestDetails.milestones.length; ++i) {
