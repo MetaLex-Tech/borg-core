@@ -233,7 +233,7 @@ contract daoVoteGrantImplant is VoteImplant {
     function proposeDirectGrant(address _token, address _recipient, uint256 _amount, string memory _desc)
         external
         onlyGrantProposer
-        returns (uint256 implantProposalId)
+        returns (uint256 governanceProposalId)
     {
         if (IERC20(_token).balanceOf(address(BORG_SAFE)) < _amount) {
             revert daoVoteGrantImplant_GrantSpendingLimitReached();
@@ -241,8 +241,8 @@ contract daoVoteGrantImplant is VoteImplant {
 
         bytes memory proposalBytecode =
             abi.encodeWithSignature("executeDirectGrant(address,address,uint256)", _token, _recipient, _amount);
-        implantProposalId = _createImplantProposal(proposalBytecode);
-        uint256 governanceProposalId = _createGovernanceVoteToExecuteProposalById(implantProposalId, _desc);
+        uint256 implantProposalId = _createImplantProposal(proposalBytecode);
+        governanceProposalId = _createGovernanceVoteToExecuteProposalById(implantProposalId, _desc);
 
         emit PendingProposalCreated(implantProposalId, governanceProposalId);
         emit GrantProposalCreated(implantProposalId, _token, _recipient, _amount, _desc);
@@ -256,7 +256,7 @@ contract daoVoteGrantImplant is VoteImplant {
     function proposeSimpleGrant(address _token, address _recipient, uint256 _amount, string memory _desc)
         external
         onlyGrantProposer
-        returns (uint256 implantProposalId)
+        returns (uint256 governanceProposalId)
     {
         if (IERC20(_token).balanceOf(address(BORG_SAFE)) < _amount) {
             revert daoVoteGrantImplant_GrantSpendingLimitReached();
@@ -265,8 +265,8 @@ contract daoVoteGrantImplant is VoteImplant {
         bytes memory proposalBytecode =
             abi.encodeWithSignature("executeSimpleGrant(address,address,uint256)", _token, _recipient, _amount);
 
-        implantProposalId = _createImplantProposal(proposalBytecode);
-        uint256 governanceProposalId = _createGovernanceVoteToExecuteProposalById(implantProposalId, _desc);
+        uint256 implantProposalId = _createImplantProposal(proposalBytecode);
+        governanceProposalId = _createGovernanceVoteToExecuteProposalById(implantProposalId, _desc);
 
         emit PendingProposalCreated(implantProposalId, governanceProposalId);
         emit GrantProposalCreated(implantProposalId, _token, _recipient, _amount, _desc);
@@ -278,7 +278,7 @@ contract daoVoteGrantImplant is VoteImplant {
     function proposeAdvancedGrant(MetaVesT.MetaVesTDetails calldata _metaVestDetails, string memory _desc)
         external
         onlyGrantProposer
-        returns (uint256 implantProposalId)
+        returns (uint256 governanceProposalId)
     {
         uint256 _milestoneTotal;
         for (uint256 i; i < _metaVestDetails.milestones.length; ++i) {
@@ -295,8 +295,8 @@ contract daoVoteGrantImplant is VoteImplant {
             _metaVestDetails
         );
 
-        implantProposalId = _createImplantProposal(proposalBytecode);
-        uint256 governanceProposalId = _createGovernanceVoteToExecuteProposalById(implantProposalId, _desc);
+        uint256 implantProposalId = _createImplantProposal(proposalBytecode);
+        governanceProposalId = _createGovernanceVoteToExecuteProposalById(implantProposalId, _desc);
 
         emit PendingProposalCreated(implantProposalId, governanceProposalId);
         emit GrantProposalCreated(
