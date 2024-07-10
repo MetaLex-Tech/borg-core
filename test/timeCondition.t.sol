@@ -97,49 +97,49 @@ contract TimeConditionTest is Test {
    // Test time condition for "BEFORE" with time before target
     function testTimeConditionBefore_WithTimeBeforeTarget() public {
         vm.warp(block.timestamp - 1 days); // Warp time to 1 day before now
-        assertTrue(timeConditionBefore.checkCondition(), "Should return true for time before target");
+        assertTrue(timeConditionBefore.checkCondition(address(0), 0), "Should return true for time before target");
     }
 
     // Test time condition for "BEFORE" with time after target
     function testTimeConditionBefore_WithTimeAfterTarget() public {
         vm.warp(block.timestamp + 2 days); // Warp time to 2 days after now
-        assertFalse(timeConditionBefore.checkCondition(), "Should return false for time after target");
+        assertFalse(timeConditionBefore.checkCondition(address(0), 0), "Should return false for time after target");
     }
 
     // Test time condition for "AFTER" with time before target
     function testTimeConditionAfter_WithTimeBeforeTarget() public {
         vm.warp(block.timestamp - 1 days); // Warp time to 1 day before now
-        assertFalse(timeConditionAfter.checkCondition(), "Should return false for time before target");
+        assertFalse(timeConditionAfter.checkCondition(address(0), 0), "Should return false for time before target");
     }
 
     // Test time condition for "AFTER" with time exactly at target
     function testTimeConditionAfter_WithTimeAtTarget() public {
         vm.warp(targetTime); // Warp time to the target time
-        assertFalse(timeConditionAfter.checkCondition(), "Should return false for time exactly at target");
+        assertFalse(timeConditionAfter.checkCondition(address(0), 0), "Should return false for time exactly at target");
     }
 
     // Test time condition for "AFTER" with time after target
     function testTimeConditionAfter_WithTimeAfterTarget() public {
         vm.warp(block.timestamp + 2 days); // Warp time to 2 days after now
-        assertTrue(timeConditionAfter.checkCondition(), "Should return true for time after target");
+        assertTrue(timeConditionAfter.checkCondition(address(0), 0), "Should return true for time after target");
     }
 
     // Test time condition for "BEFORE" with time exactly at target
     function testTimeConditionBefore_WithTimeAtTarget() public {
         vm.warp(targetTime); // Warp time to the target time
-        assertFalse(timeConditionBefore.checkCondition(), "Should return false for time exactly at target");
+        assertFalse(timeConditionBefore.checkCondition(address(0), 0), "Should return false for time exactly at target");
     }
 
     // Test time condition for "BEFORE" at the boundary (one second before target)
     function testTimeConditionBefore_AtBoundary() public {
         vm.warp(targetTime - 1 seconds); // Warp time to one second before target
-        assertTrue(timeConditionBefore.checkCondition(), "Should return true one second before target");
+        assertTrue(timeConditionBefore.checkCondition(address(0), 0), "Should return true one second before target");
     }
 
     // Test time condition for "AFTER" at the boundary (one second after target)
     function testTimeConditionAfter_AtBoundary() public {
         vm.warp(targetTime + 1 seconds); // Warp time to one second after target
-        assertTrue(timeConditionAfter.checkCondition(), "Should return true one second after target");
+        assertTrue(timeConditionAfter.checkCondition(address(0), 0), "Should return true one second after target");
     }
 
     // Test reset of vm to original state after tests

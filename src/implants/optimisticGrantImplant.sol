@@ -108,14 +108,14 @@ contract optimisticGrantImplant is BaseImplant, ReentrancyGuard { //is baseImpla
         if(block.timestamp >= grantTimeLimit)
             revert optimisticGrantImplant_GrantTimeLimitReached();
         
-        if(requireBorgVote) {
-            if(BORG_SAFE != msg.sender)
-                revert optimisticGrantImplant_CallerNotBORG();
+        if(BORG_SAFE != msg.sender)
+        {
+            if(!requireBorgVote)
+            {
+                if(!ISafe(BORG_SAFE).isOwner(msg.sender)) revert optimisticGrantImplant_CallerNotBORGMember();
+            }
+            else revert optimisticGrantImplant_CallerNotBORG();
         }
-        else {
-            if(!ISafe(BORG_SAFE).isOwner(msg.sender))
-                revert optimisticGrantImplant_CallerNotBORGMember();
-         }
 
         approvedGrantToken storage approvedToken = approvedGrantTokens[_token];
         if (approvedToken.spendingLimit == 0) {
@@ -151,14 +151,14 @@ contract optimisticGrantImplant is BaseImplant, ReentrancyGuard { //is baseImpla
         if(block.timestamp >= grantTimeLimit)
             revert optimisticGrantImplant_GrantTimeLimitReached();
 
-         if(requireBorgVote) {
-            if(BORG_SAFE != msg.sender)
-                revert optimisticGrantImplant_CallerNotBORG();
+        if(BORG_SAFE != msg.sender)
+        {
+            if(!requireBorgVote)
+            {
+                if(!ISafe(BORG_SAFE).isOwner(msg.sender)) revert optimisticGrantImplant_CallerNotBORGMember();
+            }
+            else revert optimisticGrantImplant_CallerNotBORG();
         }
-        else {
-            if(!ISafe(BORG_SAFE).isOwner(msg.sender))
-                revert optimisticGrantImplant_CallerNotBORGMember();
-         }
 
         //Configure the metavest details
         MetaVesT.Milestone[] memory emptyMilestones;
@@ -216,14 +216,14 @@ contract optimisticGrantImplant is BaseImplant, ReentrancyGuard { //is baseImpla
         if(block.timestamp >= grantTimeLimit)
             revert optimisticGrantImplant_GrantTimeLimitReached();
 
-        if(requireBorgVote) {
-            if(BORG_SAFE != msg.sender)
-                revert optimisticGrantImplant_CallerNotBORG();
+        if(BORG_SAFE != msg.sender)
+        {
+            if(!requireBorgVote)
+            {
+                if(!ISafe(BORG_SAFE).isOwner(msg.sender)) revert optimisticGrantImplant_CallerNotBORGMember();
+            }
+            else revert optimisticGrantImplant_CallerNotBORG();
         }
-        else {
-            if(!ISafe(BORG_SAFE).isOwner(msg.sender))
-                revert optimisticGrantImplant_CallerNotBORGMember();
-         }
 
          //cycle through any allocations and approve the metavest to spend the amount
         uint256 _milestoneTotal;

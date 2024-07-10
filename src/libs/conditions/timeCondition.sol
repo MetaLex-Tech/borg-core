@@ -26,7 +26,7 @@ contract TimeCondition is BaseCondition {
     /// @notice Compares the current time to the target time to return if the condition passes or fails
     /// @return bool true if the condition passes (current time is before or after the target time), false otherwise
     /// @dev No equalto needed because exact matching on block time is unlikely
-    function checkCondition() public view override returns (bool) {
+    function checkCondition(address _contract, bytes4 _functionSignature) public view override returns (bool) {
         uint256 currentTime = block.timestamp;
         if (comparison == Comparison.BEFORE) {
             return currentTime < targetTime;

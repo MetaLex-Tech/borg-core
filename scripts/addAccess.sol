@@ -28,7 +28,7 @@ contract BaseScript is Script {
   address core = 0xC65e15d37F4f49cD30A47Fb8D27CCA4A6eb37b58;
   address op = 0x8082871B3Ee9c4a1644545895ad9d0321d2b463b;
   address veto = 0x97F53CB12eC6c20C176745Bf661597a70D0837cE;
-  address vote = 0x3ED21Eab9F55E993F9528E4ceEBDdA84Ac9b93AB
+  address vote = 0x3ED21Eab9F55E993F9528E4ceEBDdA84Ac9b93AB;
   IGnosisSafe safe;
   //borgCore core;
   ejectImplant eject;
@@ -48,9 +48,9 @@ contract BaseScript is Script {
             uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY_DEPLOY");
             vm.startBroadcast(deployerPrivateKey);
             //BorgAuth(auth).updateRole(address(mockDao), 99);
-            borgCore(core).addContract(op);
-            borgCore(core).addContract(veto);
-            borgCore(core).addContract(vote);
+            borgCore(core).addFullAccessContract(op);
+            borgCore(core).addFullAccessContract(veto);
+            borgCore(core).addFullAccessContract(vote);
             vm.stopBroadcast();
         }
 

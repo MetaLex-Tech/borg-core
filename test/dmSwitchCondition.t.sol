@@ -103,19 +103,19 @@ contract dmSwitchTest is Test {
   function testDeadManSwitch() public {
     vm.prank(owner);
     deadCondition.initiateTimeDelay();
-    assertEq(deadCondition.checkCondition(), false);
+    assertEq(deadCondition.checkCondition(address(0), 0), false);
     //set the time to 11 seconds from now
     vm.warp(block.timestamp + 11 seconds); 
-    assertEq(deadCondition.checkCondition(), true);
+    assertEq(deadCondition.checkCondition(address(0), 0), true);
   }
 
   function testEarlyDeadManSwitch() public {
     vm.prank(owner);
     deadCondition.initiateTimeDelay();
-    assertEq(deadCondition.checkCondition(), false);
+    assertEq(deadCondition.checkCondition(address(0), 0), false);
     //set the time to 9 seconds from now
     vm.warp(block.timestamp + 9 seconds); 
-    assertEq(deadCondition.checkCondition(), false);
+    assertEq(deadCondition.checkCondition(address(0), 0), false);
   }
 
   function testTheFailSafe() public {

@@ -47,9 +47,9 @@ contract ejectImplant is BaseImplant {
     /// @notice ejectOwner for the DAO or oversight BORG to eject a BORG member from the Safe
     /// @param _owner address of the BORG member to be ejected from the Safe
     /// @param _threshold updating the minimum number of 'owners' required to approve a transaction to this value
-    function ejectOwner(address _owner, uint256 _threshold, bool _initiateRecovery) external onlyOwner conditionCheck {
+    function ejectOwner(address _owner, uint256 _threshold, bool _initiateRecovery) external onlyOwner conditionCheck(address(this), msg.sig) {
         if(!ALLOW_AUTH_EJECT) revert ejectImplant_ActionNotEnabled();
-        if (!checkConditions()) revert ejectImplant_ConditionsNotMet();
+        if (!checkConditions(address(this), msg.sig)) revert ejectImplant_ConditionsNotMet();
 
         address[] memory owners = ISafe(BORG_SAFE).getOwners();
         address prevOwner = address(0x1);
@@ -84,9 +84,9 @@ contract ejectImplant is BaseImplant {
     /// @notice swapOwner for the DAO or oversight BORG to swap an owner with a new owner
     /// @param _oldOwner address of the BORG member to be swapped
     /// @param _newOwner address of the new BORG member
-    function swapOwner(address _oldOwner, address _newOwner) external onlyOwner conditionCheck {
+    function swapOwner(address _oldOwner, address _newOwner) external onlyOwner conditionCheck(address(this), msg.sig) {
         if(!ALLOW_AUTH_MANAGEMENT) revert ejectImplant_ActionNotEnabled();
-        if (!checkConditions()) revert ejectImplant_ConditionsNotMet();
+        if (!checkConditions(address(this), msg.sig)) revert ejectImplant_ConditionsNotMet();
 
         address[] memory owners = ISafe(BORG_SAFE).getOwners();
         address prevOwner = address(0x1);
@@ -117,9 +117,9 @@ contract ejectImplant is BaseImplant {
 
     /// @notice changeThreshold for the DAO or oversight BORG to change the minimum number of 'owners' required to approve a transaction
     /// @param _newThreshold updating the minimum number of 'owners' required to approve a transaction to this value
-    function changeThreshold(uint256 _newThreshold) external onlyOwner conditionCheck {
+    function changeThreshold(uint256 _newThreshold) external onlyOwner conditionCheck(address(this), msg.sig) {
         if(!ALLOW_AUTH_MANAGEMENT) revert ejectImplant_ActionNotEnabled();
-        if (!checkConditions()) revert ejectImplant_ConditionsNotMet();
+        if (!checkConditions(address(this), msg.sig)) revert ejectImplant_ConditionsNotMet();
 
         bytes memory data = abi.encodeWithSignature(
             "changeThreshold(uint256)",
@@ -143,9 +143,9 @@ contract ejectImplant is BaseImplant {
     /// @notice addOwner for the DAO or oversight BORG to add a new owner to the Safe
     /// @param _newOwner address of the new BORG member
     /// @param _threshold updating the minimum number of 'owners' required to approve a transaction to this value
-    function addOwner(address _newOwner, uint256 _threshold) external onlyOwner conditionCheck {
+    function addOwner(address _newOwner, uint256 _threshold) external onlyOwner conditionCheck(address(this), msg.sig) {
         if(!ALLOW_AUTH_MANAGEMENT) revert ejectImplant_ActionNotEnabled();
-        if (!checkConditions()) revert ejectImplant_ConditionsNotMet();
+        if (!checkConditions(address(this), msg.sig)) revert ejectImplant_ConditionsNotMet();
 
         bytes memory data = abi.encodeWithSignature(
             "addOwnerWithThreshold(address,uint256)",
@@ -168,7 +168,7 @@ contract ejectImplant is BaseImplant {
 
     /// @notice for a BORG member to self-eject/resign from the BORG
     /// @param _reduce boolean to reduce the threshold if the owner is the last to self-eject
-    function selfEject(bool _reduce) public conditionCheck {
+    function selfEject(bool _reduce) public conditionCheck(address(this), msg.sig) {
         if (!ISafe(BORG_SAFE).isOwner(msg.sender)) revert ejectImplant_NotOwner();
 
         address[] memory owners = ISafe(BORG_SAFE).getOwners();

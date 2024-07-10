@@ -3,5 +3,5 @@ pragma solidity 0.8.20;
 
 /// @title BaseCondition - A contract that defines the interface for conditions
 abstract contract BaseCondition {
-    function checkCondition() public virtual returns (bool);
+    function checkCondition(address _contract, bytes4 _functionSignature) public view virtual returns (bool);
 }

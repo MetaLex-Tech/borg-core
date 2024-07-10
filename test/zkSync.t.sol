@@ -39,7 +39,7 @@ contract zkSyncTest is Test {
     vm.startPrank(dao);
     auth = new BorgAuth();
     vm.stopPrank();
-    core = new borgCore(auth, 0x1, 'zk-sync-test');
+    core = new borgCore(auth, 0x1, 'zk-sync-test', MULTISIG);
   //  failSafe = new failSafe(auth, address(safe), dao);
   //  eject = new ejectImplant(auth, MULTISIG, address(failSafe));
 

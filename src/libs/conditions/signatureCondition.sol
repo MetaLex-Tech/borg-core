@@ -79,7 +79,7 @@ contract SignatureCondition is BaseCondition {
 
     /// @notice Function to check if the condition is satisfied
     /// @return bool - Whether the condition is satisfied
-    function checkCondition() public view override returns (bool) {
+    function checkCondition(address _contract, bytes4 _functionSignature) public view override returns (bool) {
         if (logic == Logic.AND) {
             return signatureCount == numSigners;
         } else if (logic == Logic.OR) {

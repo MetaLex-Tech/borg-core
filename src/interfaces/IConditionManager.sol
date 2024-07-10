@@ -2,5 +2,5 @@
 pragma solidity 0.8.20;
 
 interface IConditionManager {
-     function checkConditions() external returns (bool result);
+     function checkConditions(address _contract, address _functionSignature) external returns (bool result);
 }

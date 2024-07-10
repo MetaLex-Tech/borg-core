@@ -61,7 +61,7 @@ contract borgCore is BaseGuard, BorgAuthACL, IEIP4824 {
         uint256 maxValue;   // maximum value for uint256 range
         int256 iminValue; // minimum value for int256 range
         int256 imaxValue;  // maximum value for int256 range
-        bytes32[] exactMatch; // array of exact match values for address, string, bytes allowed for a parameter
+        bytes32[] exactMatch; // array of hashed values for parameter matches
         uint256 byteLength; // length of the parameter in bytes
     }
 
@@ -87,8 +87,8 @@ contract borgCore is BaseGuard, BorgAuthACL, IEIP4824 {
     event ContractAdded(address indexed contractAddress);
     event ContractRemoved(address indexed contractAddress);
     event MethodCooldownUpdated(address indexed contractAddress, string methodName, uint256 newCooldown);
-    event ParameterConstraintAdded(address indexed contractAddress, string methodName, uint8 paramIndex, ParamType paramType, uint256 minValue, uint256 maxValue, bytes32[] exactMatch, uint256 byteOffset, uint256 byteLength);
-    event ParameterConstraintRemoved(address indexed contractAddress, string methodName, uint8 paramIndex);
+    event ParameterConstraintAdded(address indexed contractAddress, string methodName, uint256 paramIndex, ParamType paramType, uint256 minValue, uint256 maxValue, bytes32[] exactMatch, uint256 byteOffset, uint256 byteLength);
+    event ParameterConstraintRemoved(address indexed contractAddress, string methodName, uint256 paramIndex);
     event DaoUriUpdated(string newDaoUri);
     event LegalAgreementAdded(string agreement);
     event LegalAgreementRemoved(string agreement);
@@ -155,10 +155,10 @@ contract borgCore is BaseGuard, BorgAuthACL, IEIP4824 {
             }
             lastNativeExecutionTimestamp = block.timestamp;
          } else if (data.length >= 4) {
-            if(policy[to].allowed == false) {
+            if(!policy[to].allowed) {
               revert BORG_CORE_InvalidContract();
             }
-            if(policy[to].fullAccess != true)
+            if(!policy[to].fullAccess)
                 if(!isMethodCallAllowed(to, data))
                     revert BORG_CORE_MethodNotAuthorized();
             //Check Cooldown
@@ -291,7 +291,7 @@ contract borgCore is BaseGuard, BorgAuthACL, IEIP4824 {
     /// @dev Function to remove a legal agreement
     /// @param _index uint256, the index of the legal agreement to remove
     function removeLegalAgreement(uint256 _index) public onlyAdmin {
-        if(_index > legalAgreements.length) revert BORG_CORE_InvalidDocumentIndex();
+        if(_index >= legalAgreements.length) revert BORG_CORE_InvalidDocumentIndex();
         string memory _removedAgreement = legalAgreements[_index];
         legalAgreements[_index] = legalAgreements[legalAgreements.length - 1];
         legalAgreements.pop();
@@ -411,14 +411,17 @@ contract borgCore is BaseGuard, BorgAuthACL, IEIP4824 {
         delete policy[_contract].methods[methodSelector].parameterConstraints[_byteOffset];
         //update the offsets array
         uint256[] storage offsets = policy[_contract].methods[methodSelector].paramOffsets;
+        bool offsetFound = false;
         for (uint256 i = 0; i < offsets.length; i++) {
             if (offsets[i] == _byteOffset) {
+                offsetFound = true;
                 offsets[i] = offsets[offsets.length - 1];
                 offsets.pop();
                 break;
             }
         }
-        emit ParameterConstraintRemoved(_contract, _methodSignature, uint8(_byteOffset));
+        if(!offsetFound) revert BORG_CORE_InvalidParam();
+        emit ParameterConstraintRemoved(_contract, _methodSignature, _byteOffset);
     }
 
     /// @dev Function to check if a contract method call is allowed
@@ -451,7 +454,7 @@ contract borgCore is BaseGuard, BorgAuthACL, IEIP4824 {
                 } else if (param.paramType == ParamType.INT) {
                     // Extracting an int value
                     int intValue = abi.decode(_methodCallData[paramOffset:paramOffset+param.byteLength], (int));
-                    if (intValue < int(param.iminValue) || intValue > int(param.imaxValue)) {
+                    if (intValue < param.iminValue || intValue > param.imaxValue) {
                         return false;
                     }
                 } else {
@@ -460,10 +463,11 @@ contract borgCore is BaseGuard, BorgAuthACL, IEIP4824 {
                     for(uint256 j = 0; j < param.exactMatch.length; j++) {
                         if(param.exactMatch[j] == keccak256(matchValue)){
                             matchFound = true;
+                            break;
                         }
                     }
                     if(!matchFound) 
-                        revert BORG_CORE_ExactMatchParamterFailed();
+                        return false;
                 }
             }
             unchecked {
@@ -515,7 +519,7 @@ contract borgCore is BaseGuard, BorgAuthACL, IEIP4824 {
         policy[_contract].methods[methodSelector].allowed = true;
         //update the offsets array
         policy[_contract].methods[methodSelector].paramOffsets.push(_byteOffset);
-        emit ParameterConstraintAdded(_contract, _methodSignature, uint8(_byteOffset), _paramType, _minValue, _maxValue, _exactMatch, _byteOffset, _byteLength);
+        emit ParameterConstraintAdded(_contract, _methodSignature, _byteOffset, _paramType, _minValue, _maxValue, _exactMatch, _byteOffset, _byteLength);
     }
 
     /// @dev Interanl function to check the cooldown period for a contract method
@@ -527,7 +531,7 @@ contract borgCore is BaseGuard, BorgAuthACL, IEIP4824 {
         if (methodConstraint.cooldownPeriod == 0) {
             return true;
         }
-        if (block.timestamp - methodConstraint.lastExecutionTimestamp < methodConstraint.cooldownPeriod) {
+        if (block.timestamp < methodConstraint.cooldownPeriod + methodConstraint.lastExecutionTimestamp) {
             return false;
         }
         return true;
@@ -539,7 +543,7 @@ contract borgCore is BaseGuard, BorgAuthACL, IEIP4824 {
         if (nativeCooldown == 0) {
             return true;
         }
-        if (block.timestamp - lastNativeExecutionTimestamp < nativeCooldown) {
+        if (block.timestamp < lastNativeExecutionTimestamp + nativeCooldown) {
             return false;
         }
         return true;

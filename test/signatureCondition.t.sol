@@ -119,7 +119,7 @@ function testSign_AllSigners_AndLogic() public {
             vm.prank(signers[i]);
             signatureConditionAnd.sign();
         }
-        assertTrue(signatureConditionAnd.checkCondition(), "AND logic condition should be met after all signers sign");
+        assertTrue(signatureConditionAnd.checkCondition(address(0), 0), "AND logic condition should be met after all signers sign");
     }
 
     function testSign_SingleSigner_AndLogic() public {
@@ -130,7 +130,7 @@ function testSign_AllSigners_AndLogic() public {
 
         vm.prank(signers[0]);
         signatureConditionAnd.sign();
-        assertFalse(signatureConditionAnd.checkCondition(), "AND logic condition should not be met after only one signer signs");
+        assertFalse(signatureConditionAnd.checkCondition(address(0), 0), "AND logic condition should not be met after only one signer signs");
     }
 
     function testSign_SingleSigner_OrLogic() public {
@@ -143,7 +143,7 @@ function testSign_AllSigners_AndLogic() public {
         signatureConditionOr.sign();
         vm.prank(signers[1]);
         signatureConditionOr.sign();
-        assertTrue(signatureConditionOr.checkCondition(), "OR logic condition should be met after only one signer signs if threshold is 1");
+        assertTrue(signatureConditionOr.checkCondition(address(0), 0), "OR logic condition should be met after only one signer signs if threshold is 1");
     }
 
     function testRevokeSignature_AndLogic() public {
@@ -158,7 +158,7 @@ function testSign_AllSigners_AndLogic() public {
         }
         vm.prank(signers[0]);
         signatureConditionAnd.revokeSignature();
-        assertFalse(signatureConditionAnd.checkCondition(), "AND logic condition should not be met after a signer revokes signature");
+        assertFalse(signatureConditionAnd.checkCondition(address(0), 0), "AND logic condition should not be met after a signer revokes signature");
     }
 
     function testRevokeSignature_OrLogic() public {
@@ -173,7 +173,7 @@ function testSign_AllSigners_AndLogic() public {
         }
         vm.prank(signers[0]);
         signatureConditionOr.revokeSignature();
-        assertFalse(signatureConditionOr.checkCondition(), "OR logic condition should not be met after a signer below threshold revokes signature");
+        assertFalse(signatureConditionOr.checkCondition(address(0), 0), "OR logic condition should not be met after a signer below threshold revokes signature");
     }
 
     function testSign_ThresholdMet_OrLogic() public {
@@ -186,7 +186,7 @@ function testSign_AllSigners_AndLogic() public {
             vm.prank(signers[i]);
             signatureConditionOr.sign();
         }
-        assertTrue(signatureConditionOr.checkCondition(), "OR logic condition should be met once threshold is met");
+        assertTrue(signatureConditionOr.checkCondition(address(0), 0), "OR logic condition should be met once threshold is met");
     }
 
     function testSign_ThresholdNotMet_OrLogic() public {
@@ -197,7 +197,7 @@ function testSign_AllSigners_AndLogic() public {
 
         vm.prank(signers[0]);
         signatureConditionOr.sign();
-        assertFalse(signatureConditionOr.checkCondition(), "OR logic condition should not be met if threshold is not met");
+        assertFalse(signatureConditionOr.checkCondition(address(0), 0), "OR logic condition should not be met if threshold is not met");
     }
 
     function testThresholdExceedsSigners() public {

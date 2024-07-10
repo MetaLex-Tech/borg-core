@@ -8,7 +8,7 @@ contract DeadManSwitchCondition is BaseCondition {
     uint256 public immutable DELAY_TIME;
     address public immutable BORG_SAFE;
 
-    uint256 private startTime = 0;
+    uint256 private startTime;
     uint256 private initialNonce;
     mapping(address => bool) public isCaller;
 
@@ -51,7 +51,7 @@ contract DeadManSwitchCondition is BaseCondition {
 
     /// @notice Checks if the specified delay time has passed and the Gnosis Safe nonce is unchanged
     /// @return bool true if the delay time has passed and the nonce is unchanged, false otherwise
-    function checkCondition() public view override returns (bool) {
+    function checkCondition(address _contract, bytes4 _functionSignature) public view override returns (bool) {
         if (startTime == 0) {
             return false;
         }

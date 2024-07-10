@@ -55,19 +55,17 @@ contract ConditionManager is BorgAuthACL {
 
     /// @notice iterates through the 'conditions' array, calling each 'condition' contract's 'checkCondition()' function
     /// @return result boolean of whether all conditions (accounting for each Condition's 'Logic' operator) have been satisfied
-    function checkConditions() public returns (bool result) {
+    function checkConditions(address _contract, bytes4 _functionSignature) public view returns (bool result) {
         if (conditions.length == 0) return true;
         else {
             for (uint256 i = 0; i < conditions.length; ) {
                 if (conditions[i].op == Logic.AND) {
-                    result = ICondition(conditions[i].condition)
-                        .checkCondition();
+                    result = ICondition(conditions[i].condition).checkCondition(_contract, _functionSignature);
                     if (!result) {
                         return false;
                     }
                 } else {
-                    result = ICondition(conditions[i].condition)
-                        .checkCondition();
+                    result = ICondition(conditions[i].condition).checkCondition(_contract, _functionSignature);
                     if (result) {
                         return true;
                     }
@@ -114,17 +112,17 @@ contract ConditionManager is BorgAuthACL {
     }
 
     /// @notice modifier based on a specific function signature, to check the conditions for that function
-    modifier conditionCheck() {
+    modifier conditionCheck(address _contract, bytes4 _functionSignature) {
         Condition[] memory conditionsToCheck = conditionsByFunction[msg.sig];
         bool conditionHit = false;
         for(uint256 i = 0; i < conditionsToCheck.length; i++) {
             if(conditionsToCheck[i].op == Logic.AND) {
-                if(!ICondition(conditionsToCheck[i].condition).checkCondition()) 
+                if(!ICondition(conditionsToCheck[i].condition).checkCondition(_contract, _functionSignature)) 
                     revert ConditionManager_ConditionNotMet();
                 else
                     conditionHit = true;
             } else {
-                if(ICondition(conditionsToCheck[i].condition).checkCondition()) {
+                if(ICondition(conditionsToCheck[i].condition).checkCondition(_contract, _functionSignature)) {
                    conditionHit = true;
                    break;
                 }

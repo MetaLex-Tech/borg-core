@@ -47,7 +47,7 @@ contract ChainLinkOracleCondition is BaseCondition {
 
     /// @notice Compares the current price from the ChainLink Oracle to the target price to return if the condition passes or fails
     /// @return bool true if the condition passes (current price is greater than, equal to, or less than the target price), false otherwise
-    function checkCondition() public override view returns (bool) {
+    function checkCondition(address _contract, bytes4 _functionSignature) public override view returns (bool) {
         (
             /* uint80 roundID */,
             int256 price,

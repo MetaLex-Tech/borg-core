@@ -114,29 +114,29 @@ contract BalanceConditionTest is Test {
     function testCheckCondition_Greater_True() public {
         deal(address(token), jr, 1001 ether); // Increase balance to be greater than amount
         token.balanceOf(jr);
-        assertTrue(conditionGreater.checkCondition(), "Should return true as balance is greater than amount");
+        assertTrue(conditionGreater.checkCondition(address(0), 0), "Should return true as balance is greater than amount");
     }
 
     function testCheckCondition_Less_True() public {
         vm.prank(jr);
         ERC20(address(token)).transfer(burn, 2 ether);
-        assertTrue(conditionLess.checkCondition(), "Should return true as balance is less than amount");
+        assertTrue(conditionLess.checkCondition(address(0), 0), "Should return true as balance is less than amount");
    }
 
 
     function testCheckCondition_Less_False_Greater() public {
         deal(address(token), target, 1001 ether); // Increase balance to be greater than amount
-        assertFalse(conditionLess.checkCondition(), "Should return false as balance is greater than amount");
+        assertFalse(conditionLess.checkCondition(address(0), 0), "Should return false as balance is greater than amount");
     }
 
 
     function testBalanceAdjustment() public {
         vm.prank(jr);
         ERC20(address(token)).transfer(burn, 500 * 10**18); // Adjust balance
-        if (conditionGreater.checkCondition()) {
-            assertTrue(conditionGreater.checkCondition(), "Balance adjustment affects condition evaluation");
-        } else if (conditionLess.checkCondition()) {
-            assertTrue(conditionLess.checkCondition(), "Balance adjustment affects condition evaluation");
+        if (conditionGreater.checkCondition(address(0), 0)) {
+            assertTrue(conditionGreater.checkCondition(address(0), 0), "Balance adjustment affects condition evaluation");
+        } else if (conditionLess.checkCondition(address(0), 0)) {
+            assertTrue(conditionLess.checkCondition(address(0), 0), "Balance adjustment affects condition evaluation");
         }
     }
 
