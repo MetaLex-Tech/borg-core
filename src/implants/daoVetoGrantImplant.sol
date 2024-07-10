@@ -209,7 +209,7 @@ contract daoVetoGrantImplant is vetoImplant {
     /// @notice Internal function to delete a proposal
     /// @param _proposalId The proposal ID
 
-    function deleteProposal(uint256 _proposalId) public onlyThisOrGov {
+    function _deleteProposal(uint256 _proposalId) internal override {
         uint256 proposalIndex = proposalIndicesByProposalId[_proposalId];
         if(proposalIndex == 0) revert daoVetoGrantImplant_ProposalNotFound();
         uint256 lastProposalIndex = currentProposals.length - 1;
@@ -395,7 +395,7 @@ contract daoVetoGrantImplant is vetoImplant {
                 revert daoVetoGrantImplant_CallerNotBORGMember();
         }
 
-        bytes memory proposalBytecode = abi.encodeWithSignature("createMetavestAndLockTokens((address,bool,uint8,(uint256,uint256,uint256,uint256,uint256,uint256,uint128,uint128,uint160,uint48,uint48,uint160,uint48,uint48,address),(uint256,uint208,uint48),(uint256,uint208,uint48),(bool,bool,bool),(uint256,bool,address[])[]))", _metaVestDetails);
+        bytes memory proposalBytecode = abi.encodeWithSignature("executeAdvancedGrant((address,bool,uint8,(uint256,uint256,uint256,uint256,uint256,uint256,uint128,uint128,uint160,uint48,uint48,uint160,uint48,uint48,address),(uint256,uint208,uint48),(uint256,uint208,uint48),(bool,bool,bool),(uint256,bool,address[])[]))", _metaVestDetails);
 
         Proposal storage newProposal = currentProposals.push();
         newProposalId = ++lastProposalId;
