@@ -15,11 +15,14 @@ import "metavest/MetaVesTController.sol";
 import "../src/libs/governance/flexGovernanceAdapater.sol";
 import "../test/libraries/safe.t.sol";
 import {console} from "forge-std/console.sol";
+import "metavest/VestingAllocationFactory.sol";
+import "metavest/TokenOptionFactory.sol";
+import "metavest/RestrictedTokenFactory.sol";
 
 contract BaseScript is Script {
   address deployerAddress;
   
-  address MULTISIG = 0xC9b7683B9310aeb1B735D9646e7c742BC0A4b358;//0xC92Bc86Ae8E0561A57d1FBA63B58447b0E24c58F;//0x201308B728ACb48413CD27EC60B4FfaC074c2D01; //change this to the deployed Safe address
+  address MULTISIG = 0xA52ccdee6105D758964ee55155Ced6c012eA0e89;//0xC92Bc86Ae8E0561A57d1FBA63B58447b0E24c58F;//0x201308B728ACb48413CD27EC60B4FfaC074c2D01; //change this to the deployed Safe address
   address gxpl = 0x42069BaBe92462393FaFdc653A88F958B64EC9A3;
   IGnosisSafe safe;
   borgCore core;
@@ -50,7 +53,12 @@ contract BaseScript is Script {
             vm.startBroadcast(deployerPrivateKey);
             governanceAdapter = new FlexGovernanceAdapter(auth, address(mockDao));
             auth.updateRole(address(governanceAdapter), 98);
-            metaVesTController = new metavestController(MULTISIG, MULTISIG, address(govToken));
+
+            VestingAllocationFactory vestingFactory = new VestingAllocationFactory();
+            TokenOptionFactory tokenOptionFactory = new TokenOptionFactory();
+            RestrictedTokenFactory restrictedTokenFactory = new RestrictedTokenFactory();
+
+            metaVesTController = new metavestController(MULTISIG, MULTISIG, address(govToken), address(vestingFactory), address(tokenOptionFactory), address(restrictedTokenFactory));
             vm.stopBroadcast();
             address controllerAddr = address(metaVesTController);
             vm.startBroadcast(deployerPrivateKey);
@@ -63,19 +71,17 @@ contract BaseScript is Script {
             opGrant = new optimisticGrantImplant(auth, MULTISIG, address(metaVesTController));
             auth.updateRole(address(opGrant), 98);
 
-            voteGrant = new daoVoteGrantImplant(auth, MULTISIG, 600, 1e29, 50, address(governanceAdapter), address(mockDao), address(metaVesTController));
+            voteGrant = new daoVoteGrantImplant(auth, MULTISIG, 0, 10, 40, address(governanceAdapter), address(mockDao), address(metaVesTController));
             auth.updateRole(address(voteGrant), 98);
 
             //constructor(BorgAuth _auth, address _borgSafe, uint256 _duration, uint _quorum, uint256 _threshold, uint _waitingPeriod, address _governanceAdapter, address _governanceExecutor, address _metaVesT, address _metaVesTController) BaseImplant(_auth, _borgSafe) {
-            vetoGrant = new daoVetoGrantImplant(auth, MULTISIG, 600, 1e27, 10, 60, address(governanceAdapter), address(mockDao), address(metaVesTController));
+            vetoGrant = new daoVetoGrantImplant(auth, MULTISIG, 600, 5, 10, 600, address(governanceAdapter), address(mockDao), address(metaVesTController));
             auth.updateRole(address(vetoGrant), 98);
 
             auth.updateRole(address(governanceAdapter), 98);
             auth.updateRole(address(mockDao), 99);
             auth.updateRole(address(eject), 99);
             
-
-      
             executeSingle(getAddModule(address(opGrant)));
             executeSingle(getAddModule(address(vetoGrant)));
             executeSingle(getAddModule(address(voteGrant)));

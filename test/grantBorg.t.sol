@@ -14,6 +14,9 @@ import "./libraries/mocks/FlexGov.sol";
 import "metavest/MetaVesT.sol";
 import "metavest/MetaVesTController.sol";
 import "../src/libs/governance/flexGovernanceAdapater.sol";
+import "metavest/RestrictedTokenFactory.sol";
+import "metavest/TokenOptionFactory.sol";
+import "metavest/VestingAllocationFactory.sol";
 
 
 contract GrantBorgTest is Test {
@@ -85,7 +88,11 @@ contract GrantBorgTest is Test {
     //set up the governance adapter for our Implants
     governanceAdapter = new FlexGovernanceAdapter(auth, address(mockDao));
 
-    metaVesTController = new metavestController(MULTISIG, voting_auth, address(govToken));
+    VestingAllocationFactory vestingFactory = new VestingAllocationFactory();
+    TokenOptionFactory tokenOptionFactory = new TokenOptionFactory();
+    RestrictedTokenFactory restrictedTokenFactory = new RestrictedTokenFactory();
+
+    metaVesTController = new metavestController(MULTISIG, voting_auth, address(govToken), address(vestingFactory), address(tokenOptionFactory), address(restrictedTokenFactory));
     controllerAddr = address(metaVesTController);
 
     safe = IGnosisSafe(MULTISIG);

@@ -16,6 +16,7 @@ pragma solidity 0.8.20;
 import "./baseGuard.sol";
 import "./libs/auth.sol";
 import "./interfaces/IERC4824.sol";
+import "./libs/helpers/signatureHelper.sol";
 
 /**
  * @title      BorgCore
@@ -73,6 +74,8 @@ contract borgCore is BaseGuard, BorgAuthACL, IEIP4824 {
 
     uint256 public nativeCooldown = 0; // cooldown period for native gas transfers
     uint256 public lastNativeExecutionTimestamp = 0; // timestamp of the last native gas transfer
+    uint256 public officersRequired;
+    SignatureHelper public helper;
 
     /// Identifiers
     string public id = "unnamed-borg-core"; // identifier for the BORG
@@ -158,6 +161,15 @@ contract borgCore is BaseGuard, BorgAuthACL, IEIP4824 {
     ) 
         external override onlySafe
     {
+        if (officersRequired > 0) {
+            _checkOfficerSignatures(
+                SignatureHelper.TransactionDetails(
+                    to, value, data, operation, safeTxGas, baseGas, gasPrice, gasToken, refundReceiver
+                ),
+                signatures,
+                msgSender
+            );
+        }
         if(borgMode == borgModes.unrestricted) return;
         else if(borgMode == borgModes.blacklist) {
             //blacklist native eth mode
@@ -239,6 +251,16 @@ contract borgCore is BaseGuard, BorgAuthACL, IEIP4824 {
     /// @dev This is post transaction execution. We can react but cannot revert what just occured.
     function checkAfterExecution(bytes32 txHash, bool success) external view override {
      
+    }
+
+    function setSignatureHelper(SignatureHelper _helper) external onlyOwner {
+        if(address(_helper) == address(0)) revert BORG_CORE_InvalidContract();
+        helper = _helper;
+    }
+
+    function setOfficersRequired(uint256 _officersRequired) public onlyOwner {
+        if(helper == SignatureHelper(address(0))) revert BORG_CORE_InvalidContract();
+        officersRequired = _officersRequired;
     }
 
     /// @dev add recipient address and transaction limit to the policy recipients
@@ -720,6 +742,22 @@ contract borgCore is BaseGuard, BorgAuthACL, IEIP4824 {
 
         emit ParameterConstraintAdded(_contract, _methodSignature, _byteOffset, _paramType, _minValue, _maxValue, _iminValue, _imaxValue, _exactMatch, _byteOffset, _byteLength);
     }
+
+     function _checkOfficerSignatures(
+        SignatureHelper.TransactionDetails memory txDetails,
+        bytes calldata signatures,
+        address msgSender
+    ) internal view {
+        address[] memory signers = helper.getSigners(txDetails, signatures, msgSender, safe);
+        uint256 signedCount = 0;
+        for (uint256 i = 0; i < signers.length; i++) {
+            if (BorgAuth(AUTH).userRoles(signers[i]) >= 97) {
+                signedCount++;
+            }
+        }
+        require(signedCount >= officersRequired, "Not enough officer signatures");
+    }
+
 
     /// @dev Interanl function to check the cooldown period for a contract method
     /// @param _contract address, the address of the contract

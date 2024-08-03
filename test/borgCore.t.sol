@@ -7,6 +7,7 @@ import "solady/tokens/ERC20.sol";
 import "../src/libs/auth.sol";
 import "./libraries/safe.t.sol";
 import "../src/implants/failSafeImplant.sol";
+import "../src/libs/helpers/signatureHelper.sol";
 
 contract BorgCoreTest is Test {
   // global contract deploys for the tests
@@ -139,6 +140,34 @@ contract BorgCoreTest is Test {
         20);
     vm.prank(dao);
     core.addRecipient(owner, .01 ether);
+    executeSingle(getTransferData(address(dai), owner, .01 ether));
+  }
+
+  function testFailOfficerCheck() public {
+    executeSingle(getSetGuardData(address(MULTISIG)));
+    SignatureHelper _helper = new SignatureHelper();
+    vm.prank(dao);
+    core.setSignatureHelper(_helper);
+    vm.prank(dao);
+    core.setOfficersRequired(1);
+    vm.prank(dao);
+    core.addFullAccessOrBlockContract(address(dai));
+    executeSingle(getTransferData(address(dai), owner, .01 ether));
+  }
+
+  function testOfficerCheck() public {
+    executeSingle(getSetGuardData(address(MULTISIG)));
+    SignatureHelper _helper = new SignatureHelper();
+    vm.prank(dao);
+    core.setSignatureHelper(_helper);
+    vm.prank(dao);
+    core.setOfficersRequired(1);
+    vm.prank(dao);
+    core.addRecipient(owner, .01 ether);
+    vm.prank(dao);
+    auth.updateRole(owner, 98);
+    vm.prank(dao);
+    core.addFullAccessOrBlockContract(address(dai));
     executeSingle(getTransferData(address(dai), owner, .01 ether));
   }
 
