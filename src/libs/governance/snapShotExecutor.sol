@@ -2,7 +2,7 @@
 pragma solidity 0.8.20;
 
 import "../auth.sol";
-import "openzeppelin-contracts/utils/Address.sol";
+import "openzeppelin/contracts/utils/Address.sol";
 
 contract SnapShotExecutor is BorgAuthACL {
 
@@ -63,7 +63,11 @@ contract SnapShotExecutor is BorgAuthACL {
 
     function voteToCancel(uint256 proposalId) external {
         if(pendingProposals[proposalId].timestamp < block.timestamp) revert SnapShotExecutor_InvalidProposal();
-        if(msg.sender != borgSafe && AUTH.onlyRole(99, msg.sender)) revert SnapShotExecutor_NotAuthorized();
+        if(msg.sender != borgSafe)
+        {
+            address adapter = AUTH.roleAdapters(AUTH.OWNER_ROLE());
+            if (!(IAuthAdapter(adapter).isAuthorized(msg.sender) >= AUTH.OWNER_ROLE())) revert SnapShotExecutor_NotAuthorized();
+        }
         cancelVotes[proposalId].push(msg.sender);
         bool hasBORG = (msg.sender == borgSafe);
         for(uint256 i = 0; i < cancelVotes[proposalId].length; i++) {
