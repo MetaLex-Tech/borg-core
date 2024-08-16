@@ -8,6 +8,7 @@ import "../src/implants/optimisticGrantImplant.sol";
 import "../src/implants/daoVoteGrantImplant.sol";
 import "../src/implants/daoVetoGrantImplant.sol";
 import "../src/libs/conditions/signatureCondition.sol";
+import "../src/libs/conditions/multiUseSignCondition.sol";
 import "../src/implants/failSafeImplant.sol";
 import "../test/libraries/mocks/MockGovToken.sol";
 import "../test/libraries/mocks/FlexGov.sol";
@@ -37,11 +38,13 @@ contract BaseScript is Script {
   FlexGov mockDao;
   metavestController metaVesTController;
   FlexGovernanceAdapter governanceAdapter;
+  MultiUseSignCondition multiSignCondition;
 
      function run() public {
             deployerAddress = vm.addr(vm.envUint("PRIVATE_KEY_DEPLOY"));
             uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY_DEPLOY");
             vm.startBroadcast(deployerPrivateKey);
+            multiSignCondition = new MultiUseSignCondition(MULTISIG, 2);
             auth = new BorgAuth();
             auth.updateRole(gxpl, 98);
             govToken = new MockERC20Votes("OnlyBORGs", "oBORG");
