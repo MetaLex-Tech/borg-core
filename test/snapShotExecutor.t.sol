@@ -8,6 +8,19 @@ import "../src/libs/auth.sol";
 import "./libraries/safe.t.sol";
 import "../src/implants/failSafeImplant.sol";
 import "../src/libs/helpers/signatureHelper.sol";
+import "../src/libs/governance/SnapShotExecutor.sol";
+import "../src/libs/governance/govAuthErc721Adapater.sol";
+import "forge-std/StdUtils.sol";
+
+contract TestableERC721 is MockERC721 {
+    function mint(address to, uint256 tokenId) public {
+        _mint(to, tokenId);
+    }
+
+    function safeMint(address to, uint256 tokenId) public {
+        _safeMint(to, tokenId);
+    }
+}
 
 contract BorgCoreTest is Test {
   // global contract deploys for the tests
@@ -16,6 +29,7 @@ contract BorgCoreTest is Test {
   ejectImplant eject;
   BorgAuth auth;
   failSafeImplant failSafe;
+  SnapShotExecutor snapShotExecutor;
 
   IMultiSendCallOnly multiSendCallOnly =
     IMultiSendCallOnly(0xd34C0841a14Cd53428930D4E0b76ea2406603B00); //make sure this matches your chain
@@ -33,6 +47,7 @@ contract BorgCoreTest is Test {
   // Adding some tokens for the test
   ERC20 usdc;// = ERC20(usdc_addr);
   ERC20 dai;// = ERC20(dai_addr);
+  TestableERC721 mockNFT;
 
   /// Set our initial state: (All other tests are in isolation but share this state)
   /// 1. Set up the safe
@@ -44,8 +59,26 @@ contract BorgCoreTest is Test {
     dai = ERC20(dai_addr);
     vm.prank(dao);
     auth = new BorgAuth();
+
+    vm.prank(dao);
+    mockNFT = new TestableERC721();
+        mockNFT.initialize("testDAO", "DAO");
+
+    mockNFT.mint(dao, 1);
+    vm.prank(dao);
+    GovAuthErc721Adapter _adapter = new GovAuthErc721Adapter(address(mockNFT));
+
+    
+
+    vm.prank(dao);
+    auth.setRoleAdapter(99, address(_adapter));
+
+    vm.prank(dao);
+    //constructor(BorgAuth _auth, address _borgSafe, address _oracle, uint256 _waitingPeriod, uint256 threshold)
+    snapShotExecutor = new SnapShotExecutor(auth, address(MULTISIG), address(vip), 2 days, 2);
+
     safe = IGnosisSafe(MULTISIG);
-    core = new borgCore(auth, 0x1, borgCore.borgModes.whitelist, 'borg-core-testing', address(safe));
+    core = new borgCore(auth, 0x1, borgCore.borgModes.unrestricted, 'borg-core-testing', address(safe));
 
     failSafe = new failSafeImplant(auth, address(safe), dao);
     eject = new ejectImplant(auth, MULTISIG, address(failSafe), false, true);
@@ -56,19 +89,8 @@ contract BorgCoreTest is Test {
     executeSingle(addOwner(address(jr)));
     executeSingle(getAddEjectModule(address(eject)));
 
-    vm.prank(dao);
-    core.addFullAccessOrBlockContract(address(core));
-    /*   function addRangeParameterConstraint(
-        address _contract,
-        string memory _methodSignature,
-        uint8 _paramIndex,
-        uint256 _minValue,
-        uint256 _maxValue,
-        uint256 _byteOffset,
-        uint8 _byteLength
-    )*/
-    //borgCore.ParamType paramtype = borgCore.ParamType.UINT;
-   // executeSingle(getAddContractGuardData(address(core), address(core), 2 ether));
+    //vm.prank(dao);
+   // core.addFullAccessOrBlockContract(address(core));
 
     deal(owner, 2 ether);
     deal(MULTISIG, 2 ether);
@@ -104,11 +126,95 @@ contract BorgCoreTest is Test {
     core.addFullAccessOrBlockContract(MULTISIG);
   }
 
-  /// @dev An ERC20 transfer with no whitelists set should fail.
-  function testFailOnDai() public {
-    executeSingle(getSetGuardData(address(MULTISIG)));
-    executeSingle(getTransferData(address(dai), MULTISIG, .1 ether));
+  function testSnapShotExecutor() public {
+    vm.prank(vip);
+    bytes32 propId = snapShotExecutor.propose(address(0x01), 0, "", "test");
+    assertEq(snapShotExecutor.pendingProposalCount(), 1);
+    vm.warp(block.timestamp + 2 days);
+    vm.prank(dao);
+    snapShotExecutor.execute(propId);
   }
+
+  
+  function testFailSnapShotExecutorTransfer() public {
+    vm.prank(vip);
+    //execute transfer of 0.01 dai to owner;
+    bytes memory data = abi.encodeWithSelector(dai.transfer.selector, owner, 0.01 ether);
+    bytes32 propId = snapShotExecutor.propose(address(dai), 0, data, "transfer");
+    assertEq(snapShotExecutor.pendingProposalCount(), 1);
+    vm.warp(block.timestamp + 2 days);
+    vm.prank(dao);
+    snapShotExecutor.execute(propId);
+  }
+
+    function testVetoSnapShotExecutorTransfer() public {
+    vm.prank(vip);
+    //execute transfer of 0.01 dai to owner;
+    bytes memory data = abi.encodeWithSelector(dai.transfer.selector, owner, 0.01 ether);
+    bytes32 propId = snapShotExecutor.propose(address(dai), 0, data, "transfer");
+    assertEq(snapShotExecutor.pendingProposalCount(), 1);
+    vm.warp(block.timestamp + 2 hours);
+    vm.prank(dao);
+    snapShotExecutor.voteToCancel(propId);
+
+    vm.prank(MULTISIG);
+    snapShotExecutor.voteToCancel(propId);
+    //snapShotExecutor.execute(propId);
+  }
+
+  function testFailVetoSnapShotExecutorTransfer() public {
+    vm.prank(vip);
+    //execute transfer of 0.01 dai to owner;
+    bytes memory data = abi.encodeWithSelector(dai.transfer.selector, owner, 0.01 ether);
+    bytes32 propId = snapShotExecutor.propose(address(dai), 0, data, "transfer");
+    assertEq(snapShotExecutor.pendingProposalCount(), 1);
+    vm.warp(block.timestamp + 2 hours);
+    vm.prank(dao);
+    snapShotExecutor.voteToCancel(propId);
+
+    vm.prank(MULTISIG);
+    snapShotExecutor.voteToCancel(propId);
+
+    vm.prank(dao);
+    snapShotExecutor.execute(propId);
+  }
+
+    function testFailVetoSnapShotExecutorTransferVote() public {
+    vm.prank(vip);
+    //execute transfer of 0.01 dai to owner;
+    bytes memory data = abi.encodeWithSelector(dai.transfer.selector, owner, 0.01 ether);
+    bytes32 propId = snapShotExecutor.propose(address(dai), 0, data, "transfer");
+    assertEq(snapShotExecutor.pendingProposalCount(), 1);
+    vm.warp(block.timestamp + 2 hours);
+    vm.prank(dao);
+    snapShotExecutor.voteToCancel(propId);
+
+    vm.prank(dao);
+    snapShotExecutor.voteToCancel(propId);
+
+    vm.prank(dao);
+    snapShotExecutor.execute(propId);
+  }
+
+      function testFailVetoNonMember() public {
+    vm.prank(vip);
+    //execute transfer of 0.01 dai to owner;
+    bytes memory data = abi.encodeWithSelector(dai.transfer.selector, owner, 0.01 ether);
+    bytes32 propId = snapShotExecutor.propose(address(dai), 0, data, "transfer");
+    assertEq(snapShotExecutor.pendingProposalCount(), 1);
+    vm.warp(block.timestamp + 2 hours);
+    vm.prank(owner);
+    snapShotExecutor.voteToCancel(propId);
+
+    vm.prank(dao);
+    snapShotExecutor.voteToCancel(propId);
+
+    vm.prank(dao);
+    snapShotExecutor.execute(propId);
+  }
+
+
+
 
   /// @dev An ERC20 transfer that is correctly whitelisted should pass.
   function testPassOnDai() public {
@@ -140,34 +246,6 @@ contract BorgCoreTest is Test {
         20);
     vm.prank(dao);
     core.addRecipient(owner, .01 ether);
-    executeSingle(getTransferData(address(dai), owner, .01 ether));
-  }
-
-  function testFailOfficerCheck() public {
-    executeSingle(getSetGuardData(address(MULTISIG)));
-    SignatureHelper _helper = new SignatureHelper();
-    vm.prank(dao);
-    core.setSignatureHelper(_helper);
-    vm.prank(dao);
-    core.setGuardiansRequired(1);
-    vm.prank(dao);
-    core.addFullAccessOrBlockContract(address(dai));
-    executeSingle(getTransferData(address(dai), owner, .01 ether));
-  }
-
-  function testOfficerCheck() public {
-    executeSingle(getSetGuardData(address(MULTISIG)));
-    SignatureHelper _helper = new SignatureHelper();
-    vm.prank(dao);
-    core.setSignatureHelper(_helper);
-    vm.prank(dao);
-    core.setGuardiansRequired(1);
-    vm.prank(dao);
-    core.addRecipient(owner, .01 ether);
-    vm.prank(dao);
-    auth.updateRole(owner, 98);
-    vm.prank(dao);
-    core.addFullAccessOrBlockContract(address(dai));
     executeSingle(getTransferData(address(dai), owner, .01 ether));
   }
 
@@ -242,27 +320,6 @@ contract BorgCoreTest is Test {
         executeSingle(getTransferData(address(dai), owner, 0.01 ether));
     }
 
-  /// @dev An ERC20 payment that is over the limit should revert.
-  function testFailOnDaiOverpayment() public {
-    executeSingle(getSetGuardData(address(MULTISIG)));
-    vm.prank(dao);
-    core.addFullAccessOrBlockContract(address(dai));
-    vm.prank(dao);
-     borgCore.ParamType _paramtype = borgCore.ParamType.UINT;
-    core.addUnsignedRangeParameterConstraint(
-        address(dai),
-        "transfer(address,uint256)",
-        _paramtype,
-        0,
-        .01 ether,
-        36,
-        32
-    );
-    vm.prank(dao);
-    core.addRecipient(owner, .01 ether);
-    executeSingle(getTransferData(address(dai), owner, .1 ether));
-  }
-
   /// @dev An ERC20 payment for a token that hasn't been whitelisted should fail.
   function testFailOnUSDC() public {
     executeSingle(getSetGuardData(address(MULTISIG)));
@@ -283,12 +340,6 @@ contract BorgCoreTest is Test {
     vm.prank(dao);
     core.addRecipient(owner, 1 ether);
     executeSingle(getTransferData(usdc_addr, owner, 1 ether));
-  }
-
-  /// @dev A native gas token transfer should fail on an unwhitelisted recepient.
-  function testFailOnNativeRug() public {
-    executeSingle(getSetGuardData(address(MULTISIG)));
-    executeSingle(getNativeTransferData(owner, 2 ether), 2 ether);
   }
   
   /// @dev A native gas token transfer over the limit should fail.

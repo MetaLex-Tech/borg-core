@@ -74,7 +74,7 @@ contract borgCore is BaseGuard, BorgAuthACL, IEIP4824 {
 
     uint256 public nativeCooldown = 0; // cooldown period for native gas transfers
     uint256 public lastNativeExecutionTimestamp = 0; // timestamp of the last native gas transfer
-    uint256 public officersRequired;
+    uint256 public guardiansRequired;
     SignatureHelper public helper;
 
     /// Identifiers
@@ -161,8 +161,8 @@ contract borgCore is BaseGuard, BorgAuthACL, IEIP4824 {
     ) 
         external override onlySafe
     {
-        if (officersRequired > 0) {
-            _checkOfficerSignatures(
+        if (guardiansRequired > 0) {
+            _checkGuardiansSignatures(
                 SignatureHelper.TransactionDetails(
                     to, value, data, operation, safeTxGas, baseGas, gasPrice, gasToken, refundReceiver
                 ),
@@ -258,9 +258,9 @@ contract borgCore is BaseGuard, BorgAuthACL, IEIP4824 {
         helper = _helper;
     }
 
-    function setOfficersRequired(uint256 _officersRequired) public onlyOwner {
+    function setGuardiansRequired(uint256 _guardiansRequired) public onlyOwner {
         if(helper == SignatureHelper(address(0))) revert BORG_CORE_InvalidContract();
-        officersRequired = _officersRequired;
+        guardiansRequired = _guardiansRequired;
     }
 
     /// @dev add recipient address and transaction limit to the policy recipients
@@ -743,7 +743,7 @@ contract borgCore is BaseGuard, BorgAuthACL, IEIP4824 {
         emit ParameterConstraintAdded(_contract, _methodSignature, _byteOffset, _paramType, _minValue, _maxValue, _iminValue, _imaxValue, _exactMatch, _byteOffset, _byteLength);
     }
 
-     function _checkOfficerSignatures(
+     function _checkGuardiansSignatures(
         SignatureHelper.TransactionDetails memory txDetails,
         bytes calldata signatures,
         address msgSender
@@ -755,7 +755,7 @@ contract borgCore is BaseGuard, BorgAuthACL, IEIP4824 {
                 signedCount++;
             }
         }
-        require(signedCount >= officersRequired, "Not enough officer signatures");
+        require(signedCount >= guardiansRequired, "Not enough guardian signatures");
     }
 
 
