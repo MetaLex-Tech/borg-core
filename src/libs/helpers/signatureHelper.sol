@@ -7,6 +7,10 @@ interface IDomainSeparator {
     function domainSeparator() external view returns (bytes32);
 }
 
+/**
+    * @title SignatureHelper
+    * @dev Helper contract to verify signatures of signed messages for Gnosis Safe's
+    */
 contract SignatureHelper {
 
     struct TransactionDetails {
@@ -21,10 +25,16 @@ contract SignatureHelper {
         address payable refundReceiver;
     }
 
+    // sig domain separator constants
     bytes32 private constant DOMAIN_SEPARATOR_TYPEHASH = 0x47e79534a245952e8b16893a336b85a3d9ea9fa8c573f3d803afb92a79469218;
     bytes32 private constant SAFE_TX_TYPEHASH = 0xbb8310d486368db6bd6f849402fdd73ad53d316b5a4b2644ad6efe0f941286d8;
 
-      function getSigners(
+    /// @dev Returns the addresses of the signers of a Safe transaction
+    /// @param txDetails Transaction details
+    /// @param signatures Signature data
+    /// @param msgSender Address of the sender of the message
+    /// @param _safe Address of the Safe
+    function getSigners(
         TransactionDetails memory txDetails,
         bytes memory signatures,
         address msgSender,
@@ -62,6 +72,12 @@ contract SignatureHelper {
         return signers;
     }
 
+    /**
+     * @dev Returns the hash to be signed by an owner of the Safe.
+     * @param txDetails Details of the transaction to be signed.
+     * @param safe Address of the Safe.
+     * @return Hash to be signed.
+     */
     function getTransactionHash(TransactionDetails memory txDetails, address safe) public view returns (bytes32) {
         
         bytes32 safeTxHash = keccak256(
@@ -105,8 +121,10 @@ contract SignatureHelper {
         return id;
     }
 
-
-function signatureSplit(bytes memory signatures, uint256 pos) internal pure returns (uint8 v, bytes32 r, bytes32 s) {
+    /// @dev Splits the signature into v, r, s
+    /// @param signatures Signature data
+    /// @param pos Position in the signatures array
+    function signatureSplit(bytes memory signatures, uint256 pos) internal pure returns (uint8 v, bytes32 r, bytes32 s) {
         // solhint-disable-next-line no-inline-assembly
         assembly {
             let signaturePos := mul(0x41, pos)
@@ -122,12 +140,18 @@ function signatureSplit(bytes memory signatures, uint256 pos) internal pure retu
         }
     }
 
+    // Safe Helpers
+
+    /// @dev Returns the nonce of the Safe
+    /// @param safe Address of the Safe
     function getNonce(address safe) public view returns (uint256) {
         (bool success, bytes memory result) = safe.staticcall(abi.encodeWithSignature("nonce()"));
         require(success, "Failed to get nonce");
         return abi.decode(result, (uint256))-1;
     }
 
+    /// @dev Returns the threshold of the Safe
+    /// @param safe Address of the Safe
     function getThreshold(address safe) public view returns (uint256) {
         (bool success, bytes memory result) = safe.staticcall(abi.encodeWithSignature("getThreshold()"));
         require(success, "Failed to get threshold");

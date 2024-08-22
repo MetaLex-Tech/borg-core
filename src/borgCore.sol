@@ -161,6 +161,7 @@ contract borgCore is BaseGuard, BorgAuthACL, IEIP4824 {
     ) 
         external override onlySafe
     {
+        // If guardians are required, check the signatures and guardian threshold
         if (guardiansRequired > 0) {
             _checkGuardiansSignatures(
                 SignatureHelper.TransactionDetails(
@@ -253,13 +254,18 @@ contract borgCore is BaseGuard, BorgAuthACL, IEIP4824 {
      
     }
 
+    /// @dev sets the Signature Helper contract to be used for guardian signature verification
+    /// @param _helper SignatureHelper, the address of the SignatureHelper contract
     function setSignatureHelper(SignatureHelper _helper) external onlyOwner {
         if(address(_helper) == address(0)) revert BORG_CORE_InvalidContract();
         helper = _helper;
     }
 
+    /// @dev sets the number of guardians required for a transaction
+    /// @param _guardiansRequired uint256, the number of guardians required
     function setGuardiansRequired(uint256 _guardiansRequired) public onlyOwner {
         if(helper == SignatureHelper(address(0))) revert BORG_CORE_InvalidContract();
+        if(_guardiansRequired>helper.getThreshold(safe)) revert BORG_CORE_InvalidParam();
         guardiansRequired = _guardiansRequired;
     }
 

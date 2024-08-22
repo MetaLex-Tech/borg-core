@@ -31,7 +31,6 @@ contract MultiUseSignCondition is BaseCondition {
     /// @notice Constructor to create a SignatureCondition
     /// @param _borgSafe - The address of the Borg Safe
     /// @param _threshold - The number of signers required to satisfy the condition
-   
     constructor(
         address _borgSafe,
         uint256 _threshold
@@ -45,6 +44,8 @@ contract MultiUseSignCondition is BaseCondition {
     }
 
     /// @notice Function to sign the condition
+    /// @param _contract - The address of the contract
+    /// @param _data - The data approved for signature
     function sign(address _contract, bytes memory _data) public {
         if (!ISafe(BORG_SAFE).isOwner(msg.sender) && msg.sender != BORG_SAFE) revert SignatureCondition_CallerNotSigner();
         if (hasSignedContractBytes[msg.sender][_contract][_data])
@@ -58,7 +59,9 @@ contract MultiUseSignCondition is BaseCondition {
         emit Signed(msg.sender, _contract, _data);
     }
 
-    // Function to unsign the condition
+    /// @notice Function to unsign the condition
+    /// @param _contract - The address of the contract
+    /// @param _data - The data approved for signature
     function revokeSignature(address _contract, bytes memory _data) public {
         if (!ISafe(BORG_SAFE).isOwner(msg.sender) && msg.sender != BORG_SAFE) revert SignatureCondition_CallerNotSigner();
         if (!hasSignedContractBytes[msg.sender][_contract][_data])
@@ -75,16 +78,23 @@ contract MultiUseSignCondition is BaseCondition {
     function updateThreshold(uint256 _threshold) public onlyOwner {
         if (!ISafe(BORG_SAFE).isOwner(msg.sender)) revert SignatureCondition_CallerNotSigner();
         if (_threshold == 0) revert SignatureCondition_InvalidZero();
+        address[] memory _signers = ISafe(BORG_SAFE).getOwners();
+         if (_threshold > _signers.length)
+            revert SignatureCondition_ThresholdExceedsSigners();
         threshold = _threshold;
     }
 
     /// @notice Function to check if the condition is satisfied
+    /// @param _contract - The address of the contract
+    /// @param _functionSignature - The function signature
+    /// @param _data - The data approved for signature
     /// @return bool - Whether the condition is satisfied
     function checkCondition(address _contract, bytes4 _functionSignature, bytes memory _data) public view override returns (bool) {
       if(hasSignedContractBytes[BORG_SAFE][_contract][_data]) return true;
       return signedContractCount[_contract][_data] >= threshold;
     }
 
+    /// @notice Function to check if the caller is the safe
     modifier onlyOwner() {
         if(msg.sender!=BORG_SAFE) revert SignatureCondition_CallerNotAuthorized();
         _;
