@@ -74,7 +74,7 @@ contract borgCore is BaseGuard, BorgAuthACL, IEIP4824 {
 
     uint256 public nativeCooldown = 0; // cooldown period for native gas transfers
     uint256 public lastNativeExecutionTimestamp = 0; // timestamp of the last native gas transfer
-    uint256 public guardiansRequired;
+    uint256 public directorsRequired;
     SignatureHelper public helper;
 
     /// Identifiers
@@ -161,9 +161,9 @@ contract borgCore is BaseGuard, BorgAuthACL, IEIP4824 {
     ) 
         external override onlySafe
     {
-        // If guardians are required, check the signatures and guardian threshold
-        if (guardiansRequired > 0) {
-            _checkGuardiansSignatures(
+        // If Directors are required, check the signatures and guardian threshold
+        if (directorsRequired > 0) {
+            _checkDirectorsSignatures(
                 SignatureHelper.TransactionDetails(
                     to, value, data, operation, safeTxGas, baseGas, gasPrice, gasToken, refundReceiver
                 ),
@@ -258,15 +258,16 @@ contract borgCore is BaseGuard, BorgAuthACL, IEIP4824 {
     /// @param _helper SignatureHelper, the address of the SignatureHelper contract
     function setSignatureHelper(SignatureHelper _helper) external onlyOwner {
         if(address(_helper) == address(0)) revert BORG_CORE_InvalidContract();
+        _helper.getChainId();
         helper = _helper;
     }
 
-    /// @dev sets the number of guardians required for a transaction
-    /// @param _guardiansRequired uint256, the number of guardians required
-    function setGuardiansRequired(uint256 _guardiansRequired) public onlyOwner {
+    /// @dev sets the number of Directors required for a transaction
+    /// @param _directorsRequired uint256, the number of Directors required
+    function setDirectorsRequired(uint256 _directorsRequired) public onlyOwner {
         if(helper == SignatureHelper(address(0))) revert BORG_CORE_InvalidContract();
-        if(_guardiansRequired>helper.getThreshold(safe)) revert BORG_CORE_InvalidParam();
-        guardiansRequired = _guardiansRequired;
+        if(_directorsRequired>helper.getThreshold(safe)) revert BORG_CORE_InvalidParam();
+        directorsRequired = _directorsRequired;
     }
 
     /// @dev add recipient address and transaction limit to the policy recipients
@@ -749,7 +750,7 @@ contract borgCore is BaseGuard, BorgAuthACL, IEIP4824 {
         emit ParameterConstraintAdded(_contract, _methodSignature, _byteOffset, _paramType, _minValue, _maxValue, _iminValue, _imaxValue, _exactMatch, _byteOffset, _byteLength);
     }
 
-     function _checkGuardiansSignatures(
+     function _checkDirectorsSignatures(
         SignatureHelper.TransactionDetails memory txDetails,
         bytes calldata signatures,
         address msgSender
@@ -761,7 +762,7 @@ contract borgCore is BaseGuard, BorgAuthACL, IEIP4824 {
                 signedCount++;
             }
         }
-        require(signedCount >= guardiansRequired, "Not enough guardian signatures");
+        require(signedCount >= directorsRequired, "Not enough guardian signatures");
     }
 
 

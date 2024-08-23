@@ -149,7 +149,7 @@ contract BorgCoreTest is Test {
     vm.prank(dao);
     core.setSignatureHelper(_helper);
     vm.prank(dao);
-    core.setGuardiansRequired(1);
+    core.setDirectorsRequired(1);
     vm.prank(dao);
     core.addFullAccessOrBlockContract(address(dai));
     executeSingle(getTransferData(address(dai), owner, .01 ether));
@@ -161,7 +161,7 @@ contract BorgCoreTest is Test {
     vm.prank(dao);
     core.setSignatureHelper(_helper);
     vm.prank(dao);
-    core.setGuardiansRequired(1);
+    core.setDirectorsRequired(1);
     vm.prank(dao);
     core.addRecipient(owner, .01 ether);
     vm.prank(dao);
