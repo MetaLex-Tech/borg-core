@@ -6,6 +6,8 @@ import "../libs/auth.sol";
 import "../libs/conditions/conditionManager.sol";
 import "forge-std/interfaces/IERC20.sol";
 import "./baseImplant.sol";
+import "../interfaces/IRecoveryHook.sol";
+import "openzeppelin/contracts/interfaces/IERC165.sol";
 
 interface IERC1155 {
     function balanceOf(address account, uint256 id) external view returns (uint256);
@@ -21,6 +23,8 @@ contract failSafeImplant is BaseImplant { //is baseImplant
 
     // Recovery address
     address public immutable RECOVERY_ADDRESS;
+    IRecoveryHook public recoveryHook;
+    bool public failSafeTriggered;
 
     //Token Info Struct
     struct TokenInfo {
@@ -38,11 +42,13 @@ contract failSafeImplant is BaseImplant { //is baseImplant
     error failSafeImplant_InvalidToken();
     error failSafeImplant_FailedTransfer();
     error failSafeImplant_ZeroAddressRecovery();
+    error failSafeImplant_InvalidHook();
 
     // Events
     event TokenAdded(address indexed tokenAddress, uint256 id, uint256 amount, uint8 tokenType);
     event TokenRemoved(address indexed tokenAddress);
-
+    event RecoveryHookSet(address indexed hook);
+    event RecoveryHookRevert(address indexed hook);
     event FundsRecovered(address indexed tokenAddress, uint256 id, uint256 amount, uint8 tokenType);
 
     /// @notice Constructor
@@ -135,8 +141,23 @@ contract failSafeImplant is BaseImplant { //is baseImplant
                 if(!success) revert failSafeImplant_FailedTransfer();
                 emit FundsRecovered(tokenList[i].tokenAddress, tokenList[i].id, tokenList[i].amount, 2);
             }
-            
         }
+
+        // Call the afterRecovery hook
+        if(!failSafeTriggered)
+            if (address(recoveryHook) != address(0)) {
+                try recoveryHook.afterRecovery(BORG_SAFE) {
+                } catch {
+                   emit RecoveryHookRevert(address(recoveryHook));
+                }
+            }
+        failSafeTriggered = true;
+        
+    }
+
+    function setRecoveryHook(address _newHook) external onlyOwner {
+        if(!IERC165(_newHook).supportsInterface(type(IRecoveryHook).interfaceId)) revert failSafeImplant_InvalidHook();
+        recoveryHook = IRecoveryHook(_newHook);
     }
 
     /// @notice recoverSafeFundsERC20 function to recover ERC20 tokens from the Safe, callable by Owner (DAO or oversight BORG)
@@ -151,6 +172,15 @@ contract failSafeImplant is BaseImplant { //is baseImplant
         bool success = gnosisSafe.execTransactionFromModule(_token, 0, data, Enum.Operation.Call);
         if(!success) revert failSafeImplant_FailedTransfer();
         emit FundsRecovered(_token, 0, amountToSend, 0);
+        // Call the afterRecovery hook
+        if(!failSafeTriggered)
+            if (address(recoveryHook) != address(0)) {
+                try recoveryHook.afterRecovery(BORG_SAFE) {
+                } catch {
+                   emit RecoveryHookRevert(address(recoveryHook));
+                }
+            }
+        failSafeTriggered = true;
     }
 
     /// @notice recoverSafeFundsERC721 function to recover ERC721 tokens from the Safe, callable by Owner (DAO or oversight BORG)
@@ -164,6 +194,15 @@ contract failSafeImplant is BaseImplant { //is baseImplant
         bool success = gnosisSafe.execTransactionFromModule(_token, 0, data, Enum.Operation.Call);
         if(!success) revert failSafeImplant_FailedTransfer();
         emit FundsRecovered(_token, _id, 1, 1);
+        // Call the afterRecovery hook
+        if(!failSafeTriggered)
+            if (address(recoveryHook) != address(0)) {
+                try recoveryHook.afterRecovery(BORG_SAFE) {
+                } catch {
+                   emit RecoveryHookRevert(address(recoveryHook));
+                }
+            }
+        failSafeTriggered = true;
     }
 
     /// @notice recoverSafeFundsERC1155 function to recover ERC1155 tokens from the Safe, callable by Owner (DAO or oversight BORG)
@@ -179,6 +218,15 @@ contract failSafeImplant is BaseImplant { //is baseImplant
         bool success = gnosisSafe.execTransactionFromModule(_token, 0, data, Enum.Operation.Call);
         if(!success) revert failSafeImplant_FailedTransfer();
         emit FundsRecovered(_token, _id, _amount, 2);
+        // Call the afterRecovery hook
+        if(!failSafeTriggered)
+            if (address(recoveryHook) != address(0)) {
+                try recoveryHook.afterRecovery(BORG_SAFE) {
+                } catch {
+                   emit RecoveryHookRevert(address(recoveryHook));
+                }
+            }
+        failSafeTriggered = true;
     }
 }
 

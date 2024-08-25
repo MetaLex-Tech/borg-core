@@ -9,6 +9,8 @@ import "solady/tokens/ERC1155.sol";
 import "../src/libs/conditions/signatureCondition.sol";
 import "../src/libs/auth.sol";
 import "./libraries/safe.t.sol";
+import "../src/libs/hooks/exampleRecoveryHook.sol";
+import "../src/libs/hooks/ExampleRecoveryHookRevert.sol";
 
 contract FailSafeImplantTest is Test {
     IGnosisSafe safe;
@@ -43,7 +45,7 @@ contract FailSafeImplantTest is Test {
 
         vm.prank(dao);
         auth.updateRole(address(owner), 98);
-
+        deal(MULTISIG, 2 ether);
     }
 
     /// @dev Test adding a token to the FailSafeImplant and check if it's stored correctly
@@ -83,6 +85,27 @@ contract FailSafeImplantTest is Test {
         vm.expectRevert(failSafeImplant.failSafeImplant_ConditionsNotMet.selector);
         vm.prank(dao);
         failSafe.recoverSafeFunds();
+    }
+
+    function testRecoveryHook() public {
+        ExampleRecoveryHook hook = new ExampleRecoveryHook();
+        vm.prank(dao);
+        failSafe.setRecoveryHook(address(hook));
+        vm.prank(dao);
+        failSafe.recoverSafeFunds();
+        assertEq(failSafe.failSafeTriggered(), true);
+    }
+
+    function testRecoveryHookRevertCaught() public {
+        ExampleRecoveryHookRevert hook = new ExampleRecoveryHookRevert();
+        vm.prank(dao);
+        failSafe.setRecoveryHook(address(hook));
+        vm.prank(dao);
+        assertEq(address(MULTISIG).balance, 2 ether);
+        failSafe.recoverSafeFunds();
+        //check that failSafe's eth balance is 0
+        assertEq(address(MULTISIG).balance, 0);
+        assertEq(failSafe.failSafeTriggered(), true);
     }
 
     /// @dev Test recoverSafeFunds for ERC20
