@@ -128,6 +128,7 @@ contract borgCore is BaseGuard, BorgAuthACL, IEIP4824 {
     error BORG_CORE_NativeCooldownActive();
     error BORG_CORE_InvalidDocumentIndex();
     error BORG_CORE_CallerMustBeSafe();
+    error BORG_CORE_NotEnoughDirectorSignatures();
 
     /// Constructor
     /// @param _auth Address, BorgAuth contract address
@@ -163,13 +164,12 @@ contract borgCore is BaseGuard, BorgAuthACL, IEIP4824 {
     {
         // If Directors are required, check the signatures and guardian threshold
         if (directorsRequired > 0) {
-            _checkDirectorsSignatures(
+            if(!_checkDirectorsSignatures(
                 SignatureHelper.TransactionDetails(
                     to, value, data, operation, safeTxGas, baseGas, gasPrice, gasToken, refundReceiver
                 ),
-                signatures,
-                msgSender
-            );
+                signatures
+            )) revert BORG_CORE_NotEnoughDirectorSignatures();
         }
         if(borgMode == borgModes.unrestricted) return;
         else if(borgMode == borgModes.blacklist) {
@@ -750,19 +750,21 @@ contract borgCore is BaseGuard, BorgAuthACL, IEIP4824 {
         emit ParameterConstraintAdded(_contract, _methodSignature, _byteOffset, _paramType, _minValue, _maxValue, _iminValue, _imaxValue, _exactMatch, _byteOffset, _byteLength);
     }
 
+    /// @dev Internal function to check the guardian signatures for a transaction
+    /// @param txDetails TransactionDetails, the details of the transaction
+    /// @param signatures bytes, the signatures of the guardians
      function _checkDirectorsSignatures(
         SignatureHelper.TransactionDetails memory txDetails,
-        bytes calldata signatures,
-        address msgSender
-    ) internal view {
-        address[] memory signers = helper.getSigners(txDetails, signatures, msgSender, safe);
+        bytes calldata signatures
+    ) internal view returns (bool) {
+        address[] memory signers = helper.getSigners(txDetails, signatures, safe);
         uint256 signedCount = 0;
         for (uint256 i = 0; i < signers.length; i++) {
             if (BorgAuth(AUTH).userRoles(signers[i]) >= 97) {
                 signedCount++;
             }
         }
-        require(signedCount >= directorsRequired, "Not enough guardian signatures");
+        return signedCount >= directorsRequired;
     }
 
 

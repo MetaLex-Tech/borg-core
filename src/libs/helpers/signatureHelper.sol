@@ -32,12 +32,10 @@ contract SignatureHelper {
     /// @dev Returns the addresses of the signers of a Safe transaction
     /// @param txDetails Transaction details
     /// @param signatures Signature data
-    /// @param msgSender Address of the sender of the message
     /// @param _safe Address of the Safe
     function getSigners(
         TransactionDetails memory txDetails,
         bytes memory signatures,
-        address msgSender,
         address _safe
     ) public view returns (address[] memory) {
         bytes32 txHash = getTransactionHash(txDetails, _safe);
@@ -58,7 +56,6 @@ contract SignatureHelper {
             } else if (v == 1) {
                 // Approved hash
                 currentOwner = address(uint160(uint256(r)));
-              //  require(msgSender == currentOwner || approvedHashes(currentOwner, txHash) != 0, "GS025");
             } else if (v > 30) {
                 // eth_sign
                 currentOwner = ecrecover(keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", txHash)), v - 4, r, s);
@@ -66,7 +63,6 @@ contract SignatureHelper {
                 // Standard EC signature
                 currentOwner = ecrecover(txHash, v, r, s);
             }
-           // require(isOwner(currentOwner), "GS026");
             signers[i] = currentOwner;
         }
         return signers;
