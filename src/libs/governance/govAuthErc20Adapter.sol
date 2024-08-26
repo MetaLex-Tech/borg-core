@@ -16,6 +16,6 @@ contract GovAuthErc20Adapter is IAuthAdapter {
     }
 
     function isAuthorized(address user) external view override returns (uint256) {
-        return IERC721(tokenContract).balanceOf(user) > threshold ? 99 : 0;
+        return IERC20(tokenContract).balanceOf(user) > threshold ? 99 : 0;
     }
 }
