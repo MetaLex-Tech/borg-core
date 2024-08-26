@@ -155,9 +155,14 @@ contract failSafeImplant is BaseImplant { //is baseImplant
         
     }
 
+    /// @notice setRecoveryHook function to set the recovery hook
+    /// @param _newHook The address of the new recovery hook
     function setRecoveryHook(address _newHook) external onlyOwner {
+        //Check the hook interface
         if(!IERC165(_newHook).supportsInterface(type(IRecoveryHook).interfaceId)) revert failSafeImplant_InvalidHook();
+        //Set the new hook
         recoveryHook = IRecoveryHook(_newHook);
+        emit RecoveryHookSet(_newHook);
     }
 
     /// @notice recoverSafeFundsERC20 function to recover ERC20 tokens from the Safe, callable by Owner (DAO or oversight BORG)
