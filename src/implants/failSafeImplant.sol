@@ -145,14 +145,15 @@ contract failSafeImplant is BaseImplant { //is baseImplant
 
         // Call the afterRecovery hook
         if(!failSafeTriggered)
+        {
             if (address(recoveryHook) != address(0)) {
                 try recoveryHook.afterRecovery(BORG_SAFE) {
                 } catch {
                    emit RecoveryHookRevert(address(recoveryHook));
                 }
             }
-        failSafeTriggered = true;
-        
+            failSafeTriggered = true;
+        }
     }
 
     /// @notice setRecoveryHook function to set the recovery hook
@@ -178,14 +179,7 @@ contract failSafeImplant is BaseImplant { //is baseImplant
         if(!success) revert failSafeImplant_FailedTransfer();
         emit FundsRecovered(_token, 0, amountToSend, 0);
         // Call the afterRecovery hook
-        if(!failSafeTriggered)
-            if (address(recoveryHook) != address(0)) {
-                try recoveryHook.afterRecovery(BORG_SAFE) {
-                } catch {
-                   emit RecoveryHookRevert(address(recoveryHook));
-                }
-            }
-        failSafeTriggered = true;
+        _checkAfterRecovery();
     }
 
     /// @notice recoverSafeFundsERC721 function to recover ERC721 tokens from the Safe, callable by Owner (DAO or oversight BORG)
@@ -200,14 +194,7 @@ contract failSafeImplant is BaseImplant { //is baseImplant
         if(!success) revert failSafeImplant_FailedTransfer();
         emit FundsRecovered(_token, _id, 1, 1);
         // Call the afterRecovery hook
-        if(!failSafeTriggered)
-            if (address(recoveryHook) != address(0)) {
-                try recoveryHook.afterRecovery(BORG_SAFE) {
-                } catch {
-                   emit RecoveryHookRevert(address(recoveryHook));
-                }
-            }
-        failSafeTriggered = true;
+        _checkAfterRecovery();
     }
 
     /// @notice recoverSafeFundsERC1155 function to recover ERC1155 tokens from the Safe, callable by Owner (DAO or oversight BORG)
@@ -224,14 +211,19 @@ contract failSafeImplant is BaseImplant { //is baseImplant
         if(!success) revert failSafeImplant_FailedTransfer();
         emit FundsRecovered(_token, _id, _amount, 2);
         // Call the afterRecovery hook
-        if(!failSafeTriggered)
+        _checkAfterRecovery();
+    }
+
+    function _checkAfterRecovery() internal {
+        if(!failSafeTriggered) {
             if (address(recoveryHook) != address(0)) {
                 try recoveryHook.afterRecovery(BORG_SAFE) {
                 } catch {
-                   emit RecoveryHookRevert(address(recoveryHook));
+                emit RecoveryHookRevert(address(recoveryHook));
                 }
             }
-        failSafeTriggered = true;
+            failSafeTriggered = true;
+        }
     }
 }
 
