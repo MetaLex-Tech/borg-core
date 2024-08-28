@@ -29,7 +29,7 @@ contract CoreAdminWrapper {
     }
 
     modifier onlyThis() {
-        if(msg.sender != address(this)) revert CoreAdminWrapper_NotBorgSafe();
+        if(msg.sender != address(this)) revert CoreAdminWrapper_ExecutionFailed();
         _;
     }
 
@@ -80,26 +80,44 @@ contract CoreAdminWrapper {
         return data;
     }
 
-    function mintSublicenses(uint256 _tokenId, uint256 _supply) external onlyThis returns(bytes memory) {
-        (bool success, bytes memory data) = address(core).call(abi.encodeWithSignature("mintSublicenses(uint256,uint256)", _tokenId, _supply));
+    function upgradeToAndCall(address newImplementation, bytes memory data) external onlyThis returns(bytes memory) {
+        (bool success, bytes memory returnData) = address(core).call(abi.encodeWithSignature("upgradeToAndCall(address,bytes)", newImplementation, data));
+        if(!success) revert CoreAdminWrapper_ExecutionFailed();
+        return returnData;
+    }
+
+    function initialize(address _psyNFT, address _psycSale, address _treasury) external onlyThis returns(bytes memory) {
+        (bool success, bytes memory data) = address(core).call(abi.encodeWithSignature("initialize(address,address,address)", _psyNFT, _psycSale, _treasury));
         if(!success) revert CoreAdminWrapper_ExecutionFailed();
         return data;
     }
 
-    function transferNftsToAuction(uint256[] memory _tokenIds) external onlyThis returns(bytes memory) {
-        (bool success, bytes memory data) = address(core).call(abi.encodeWithSignature("transferNftsToAuction(uint256[])", _tokenIds));
+    function updatePsyNftAddress(address _newPsyNftAddress) external onlyThis returns(bytes memory) {
+        (bool success, bytes memory data) = address(core).call(abi.encodeWithSignature("updatePsyNftAddress(address)", _newPsyNftAddress));
         if(!success) revert CoreAdminWrapper_ExecutionFailed();
         return data;
     }
 
-    function transferNftsToUser(uint256[] memory _tokenIds, address _user) external onlyThis returns(bytes memory) {
-        (bool success, bytes memory data) = address(core).call(abi.encodeWithSignature("transferNftsToUser(uint256[],address)", _tokenIds, _user));
+    function updatePsycSaleAddress(address _newPsycSaleAddress) external onlyThis returns(bytes memory) {
+        (bool success, bytes memory data) = address(core).call(abi.encodeWithSignature("updatePsycSaleAddress(address)", _newPsycSaleAddress));
         if(!success) revert CoreAdminWrapper_ExecutionFailed();
         return data;
     }
 
-    function approveNftTransfer(uint256 _tokenId, address _to, uint256 _allowedTransferTimeInSeconds) external onlyThis returns(bytes memory) {
-        (bool success, bytes memory data) = address(core).call(abi.encodeWithSignature("approveNftTransfer(uint256,address,uint256)", _tokenId, _to, _allowedTransferTimeInSeconds));
+    function updateTreasuryAddress(address _newTreasuryAddress) external onlyThis returns(bytes memory) {
+        (bool success, bytes memory data) = address(core).call(abi.encodeWithSignature("updateTreasuryAddress(address)", _newTreasuryAddress));
+        if(!success) revert CoreAdminWrapper_ExecutionFailed();
+        return data;
+    }
+
+    function switchRageQuit() external onlyThis returns(bytes memory) {
+        (bool success, bytes memory data) = address(core).call(abi.encodeWithSignature("switchRageQuit()"));
+        if(!success) revert CoreAdminWrapper_ExecutionFailed();
+        return data;
+    }
+
+    function mintInitialBatch() external onlyBorgSafe returns(bytes memory) {
+        (bool success, bytes memory data) = address(core).call(abi.encodeWithSignature("mintInitialBatch()"));
         if(!success) revert CoreAdminWrapper_ExecutionFailed();
         return data;
     }
@@ -110,38 +128,14 @@ contract CoreAdminWrapper {
         return data;
     }
 
-    function rageQuit(uint256 _tokenId) external onlyThis returns(bytes memory) {
-        (bool success, bytes memory data) = address(core).call(abi.encodeWithSignature("rageQuit(uint256)", _tokenId));
+    function createSaleBatchPsycSale(uint256[] memory _tokenIDs, uint256 _saleStartTime, uint256 _floorPrice, uint256 _ceilingPrice, bytes32 _merkleRoot, string memory _ipfsHash) external onlyThis returns(uint256) {
+        (bool success, bytes memory data) = address(core).call(abi.encodeWithSignature("createSaleBatchPsycSale(uint256[],uint256,uint256,uint256,bytes32,string)", _tokenIDs, _saleStartTime, _floorPrice, _ceilingPrice, _merkleRoot, _ipfsHash));
         if(!success) revert CoreAdminWrapper_ExecutionFailed();
-        return data;
+        return abi.decode(data, (uint256));
     }
 
-    function enableRageQuit() external onlyThis returns(bytes memory) {
-        (bool success, bytes memory data) = address(core).call(abi.encodeWithSignature("enableRageQuit()"));
-        if(!success) revert CoreAdminWrapper_ExecutionFailed();
-        return data;
-    }
-    
-    function disableRageQuit() external onlyThis returns(bytes memory) {
-        (bool success, bytes memory data) = address(core).call(abi.encodeWithSignature("disableRageQuit()"));
-        if(!success) revert CoreAdminWrapper_ExecutionFailed();
-        return data;
-    }
-
-    function setAuctionContract(address _auction) external onlyBorgSafe returns(bytes memory) {
-        (bool success, bytes memory data) = address(core).call(abi.encodeWithSignature("setAuctionContract(address)", _auction));
-        if(!success) revert CoreAdminWrapper_ExecutionFailed();
-        return data;
-    }
-
-    function updateTreasury(address _treasury) external onlyThis returns(bytes memory) {
-        (bool success, bytes memory data) = address(core).call(abi.encodeWithSignature("updateTreasury(address)", _treasury));
-        if(!success) revert CoreAdminWrapper_ExecutionFailed();
-        return data;
-    }
-
-    function transferOwnership(address newOwner) external onlyThis returns(bytes memory) {
-        (bool success, bytes memory data) = address(core).call(abi.encodeWithSignature("transferOwnership(address)", newOwner));
+    function approveNftTransfer(uint256 _tokenId, address _to, uint256 _allowedTransferTimeInSeconds) external onlyThis returns(bytes memory) {
+        (bool success, bytes memory data) = address(core).call(abi.encodeWithSignature("approveNftTransfer(uint256,address,uint256)", _tokenId, _to, _allowedTransferTimeInSeconds));
         if(!success) revert CoreAdminWrapper_ExecutionFailed();
         return data;
     }
@@ -158,16 +152,20 @@ contract CoreAdminWrapper {
         return data;
     }
 
-    function OwnableInvalidOwner(address owner)  external onlyThis returns(bytes memory) {
-        (bool success, bytes memory data) = address(core).call(abi.encodeWithSignature("OwnableInvalidOwner(address)", owner));
+    function transferOwnership(address newOwner) external onlyThis returns(bytes memory) {
+        (bool success, bytes memory data) = address(core).call(abi.encodeWithSignature("transferOwnership(address)", newOwner));
         if(!success) revert CoreAdminWrapper_ExecutionFailed();
         return data;
     }
 
-    function OwnableUnauthorizedAccount(address account) external onlyThis returns(bytes memory) {
-        (bool success, bytes memory data) = address(core).call(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", account));
+    function rageQuit(uint256 _tokenId) external onlyThis returns(bytes memory) {
+        (bool success, bytes memory data) = address(core).call(abi.encodeWithSignature("rageQuit(uint256)", _tokenId));
         if(!success) revert CoreAdminWrapper_ExecutionFailed();
         return data;
     }
+
+
+
 
 }
+

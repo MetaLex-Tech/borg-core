@@ -1,29 +1,29 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity 0.8.20;
 
+//[{"inputs":[],"stateMutability":"nonpayable","type":"constructor"},{"inputs":[{"internalType":"address","name":"target","type":"address"}],"name":"AddressEmptyCode","type":"error"},{"inputs":[{"internalType":"address","name":"implementation","type":"address"}],"name":"ERC1967InvalidImplementation","type":"error"},{"inputs":[],"name":"ERC1967NonPayable","type":"error"},{"inputs":[],"name":"FailedInnerCall","type":"error"},{"inputs":[],"name":"InvalidInitialization","type":"error"},{"inputs":[],"name":"NotInitializing","type":"error"},{"inputs":[{"internalType":"address","name":"owner","type":"address"}],"name":"OwnableInvalidOwner","type":"error"},{"inputs":[{"internalType":"address","name":"account","type":"address"}],"name":"OwnableUnauthorizedAccount","type":"error"},{"inputs":[],"name":"UUPSUnauthorizedCallContext","type":"error"},{"inputs":[{"internalType":"bytes32","name":"slot","type":"bytes32"}],"name":"UUPSUnsupportedProxiableUUID","type":"error"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint64","name":"version","type":"uint64"}],"name":"Initialized","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"previousOwner","type":"address"},{"indexed":true,"internalType":"address","name":"newOwner","type":"address"}],"name":"OwnershipTransferStarted","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"previousOwner","type":"address"},{"indexed":true,"internalType":"address","name":"newOwner","type":"address"}],"name":"OwnershipTransferred","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"address","name":"psyNft","type":"address"}],"name":"PsyNftAddressChanged","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"address","name":"psycSale","type":"address"}],"name":"PsycSaleAddressChanged","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"bool","name":"newStatus","type":"bool"}],"name":"RageQuitStatusChanged","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint256","name":"tokenId","type":"uint256"},{"indexed":false,"internalType":"address","name":"to","type":"address"},{"indexed":false,"internalType":"uint256","name":"allowedTransferTimeInSeconds","type":"uint256"}],"name":"TransferApproved","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"address","name":"treasury","type":"address"}],"name":"TreasuryAddressChanged","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"implementation","type":"address"}],"name":"Upgraded","type":"event"},{"inputs":[],"name":"UPGRADE_INTERFACE_VERSION","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"acceptOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"_tokenId","type":"uint256"},{"internalType":"address","name":"_to","type":"address"},{"internalType":"uint256","name":"_allowedTransferTimeInSeconds","type":"uint256"}],"name":"approveNftTransfer","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256[]","name":"_tokenIDs","type":"uint256[]"},{"internalType":"uint256","name":"_saleStartTime","type":"uint256"},{"internalType":"uint256","name":"_floorPrice","type":"uint256"},{"internalType":"uint256","name":"_ceilingPrice","type":"uint256"},{"internalType":"bytes32","name":"_merkleRoot","type":"bytes32"},{"internalType":"string","name":"_ipfsHash","type":"string"}],"name":"createSaleBatchPsycSale","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"_psyNFT","type":"address"},{"internalType":"address","name":"_psycSale","type":"address"},{"internalType":"address","name":"_treasury","type":"address"}],"name":"initialize","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"_tokenId","type":"uint256"},{"internalType":"address","name":"_user","type":"address"}],"name":"kick","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"mintInitialBatch","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"mintNextBatch","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"owner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"pendingOwner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"proxiableUUID","outputs":[{"internalType":"bytes32","name":"","type":"bytes32"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"psyNFT","outputs":[{"internalType":"contract PsyNFT","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"psycSale","outputs":[{"internalType":"contract PsycSale","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"_tokenId","type":"uint256"}],"name":"rageQuit","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"rageQuitAllowed","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"renounceOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"switchRageQuit","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"newOwner","type":"address"}],"name":"transferOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"treasury","outputs":[{"internalType":"contract Treasury","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"_newPsyNftAddress","type":"address"}],"name":"updatePsyNftAddress","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"_newPsycSaleAddress","type":"address"}],"name":"updatePsycSaleAddress","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"_newTreasuryAddress","type":"address"}],"name":"updateTreasuryAddress","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"newImplementation","type":"address"},{"internalType":"bytes","name":"data","type":"bytes"}],"name":"upgradeToAndCall","outputs":[],"stateMutability":"payable","type":"function"}]
+
 interface ICore {
+    function acceptOwnership() external;
+    function approveNftTransfer(uint256 _tokenId, address _to, uint256 _allowedTransferTimeInSeconds) external;
+    function createSaleBatchPsycSale(uint256[] memory _tokenIDs, uint256 _saleStartTime, uint256 _floorPrice, uint256 _ceilingPrice, bytes32 _merkleRoot, string memory _ipfsHash) external returns (uint256);
+    function initialize(address _psyNFT, address _psycSale, address _treasury) external;
+    function kick(uint256 _tokenId, address _user) external;
     function mintInitialBatch() external;
     function mintNextBatch() external;
-    function mintSublicenses(uint256 _tokenId, uint256 _supply) external;
-    function transferNftsToAuction(uint256[] memory _tokenIds) external;
-    function transferNftsToUser(uint256[] memory _tokenIds, address _user) external;
-    function approveNftTransfer(uint256 _tokenId, address _to, uint256 _allowedTransferTimeInSeconds) external;
-    function kick(uint256 _tokenId, address _user) external;
-    function rageQuit(uint256 _tokenId) external;
-    function enableRageQuit() external;
-    function disableRageQuit() external;
-    function setAuctionContract(address _auction) external;
-    function updateTreasury(address _treasury) external;
-    function nftSublicenses() external view returns (address);
-    function psyNFT() external view returns (address);
-    function auctionContract() external view returns (address);
-    function treasury() external view returns (address);
-    function rageQuitAllowed() external view returns (bool);
     function owner() external view returns (address);
     function pendingOwner() external view returns (address);
-    function transferOwnership(address newOwner) external;
-    function acceptOwnership() external;
+    function proxiableUUID() external view returns (bytes32);
+    function psyNFT() external view returns (address);
+    function psycSale() external view returns (address);
+    function rageQuit(uint256 _tokenId) external;
+    function rageQuitAllowed() external view returns (bool);
     function renounceOwnership() external;
-    function OwnableInvalidOwner(address owner) external;
-    function OwnableUnauthorizedAccount(address account) external;
+    function switchRageQuit() external;
+    function transferOwnership(address newOwner) external;
+    function treasury() external view returns (address);
+    function updatePsyNftAddress(address _newPsyNftAddress) external;
+    function updatePsycSaleAddress(address _newPsycSaleAddress) external;
+    function updateTreasuryAddress(address _newTreasuryAddress) external;
+    function upgradeToAndCall(address newImplementation, bytes memory data) external payable;
 }

@@ -11,6 +11,8 @@ interface IGnosisSafe {
 
     function setGuard(address guard) external;
 
+    function enableModule(address module) external;
+
     function execTransaction(
         address to,
         uint256 value,
