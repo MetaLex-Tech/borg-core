@@ -10,6 +10,7 @@ import "../src/implants/failSafeImplant.sol";
 import "./libraries/mocks/MockPerm.sol";
 import "../src/clients/psydao/interfaces/ICore.sol";
 import "../src/clients/psydao/CoreAdminWrapper.sol";
+import "../src/clients/psydao/MockWrapper.sol";
 
 contract BlackListTest is Test {
   // global contract deploys for the tests
@@ -21,6 +22,7 @@ contract BlackListTest is Test {
   BorgAuth auth;
   failSafeImplant failSafe;
   MockPerm mockPerm;
+  MockWrapper mw;
 
   IMultiSendCallOnly multiSendCallOnly =
     IMultiSendCallOnly(0xd34C0841a14Cd53428930D4E0b76ea2406603B00); //make sure this matches your chain
@@ -61,6 +63,7 @@ contract BlackListTest is Test {
     coreContract = ICore(address(core_contract));
 
     caw = new CoreAdminWrapper(core_contract, dao, MULTISIG);
+    mw = new MockWrapper(core_contract, dao, MULTISIG);
 
     vm.prank(core_owner);
     coreContract.transferOwnership(address(caw));
@@ -191,6 +194,18 @@ contract BlackListTest is Test {
     caw.setBorgApproval(methodId, data);
   }
 
+  function testMockWrapper() public 
+  {
+    bytes memory data = abi.encodeWithSignature("callForSuccess()");
+    bytes4 methodId = mw.callForSuccess.selector;
+    
+    vm.prank(dao);
+    mw.setDaoApproval(methodId, data);
+
+    vm.prank(MULTISIG);
+    mw.setBorgApproval(methodId, data);
+  }
+
   //do the same test for the other functions taking note of which functions are onlyThis (dual approval), or borg only or dao only
 
    /* function testDualCallUpgradeToAndCall() public
@@ -266,12 +281,6 @@ contract BlackListTest is Test {
     
         vm.prank(MULTISIG);
         caw.setBorgApproval(methodId, data);
-    }
-
-    function testDualCallMintInitialBatch() public
-    {
-        vm.prank(MULTISIG);
-        caw.mintInitialBatch();
     }
 
     function testDualCallKick() public

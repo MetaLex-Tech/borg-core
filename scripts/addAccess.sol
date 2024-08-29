@@ -8,30 +8,42 @@ import "../src/implants/optimisticGrantImplant.sol";
 import "../src/implants/daoVoteGrantImplant.sol";
 import "../src/implants/daoVetoGrantImplant.sol";
 import "../src/libs/conditions/signatureCondition.sol";
+import "../src/libs/conditions/multiUseSignCondition.sol";
 import "../src/implants/failSafeImplant.sol";
 import "../test/libraries/mocks/MockGovToken.sol";
 import "../test/libraries/mocks/FlexGov.sol";
-import "metavest/MetaVesT.sol";
 import "metavest/MetaVesTController.sol";
 import "../src/libs/governance/flexGovernanceAdapater.sol";
 import "../test/libraries/safe.t.sol";
-import "../src/libs/auth.sol";
 import {console} from "forge-std/console.sol";
+import "metavest/VestingAllocationFactory.sol";
+import "metavest/TokenOptionFactory.sol";
+import "metavest/RestrictedTokenFactory.sol";
+import "../src/libs/governance/SnapShotExecutor.sol";
+import "../src/libs/governance/govAuthErc721Adapater.sol";
+import "forge-std/StdUtils.sol";
+import "../src/clients/psydao/MockWrapper.sol";
+
+contract TestableERC721 is MockERC721 {
+    function mint(address to, uint256 tokenId) public {
+        _mint(to, tokenId);
+    }
+
+    function safeMint(address to, uint256 tokenId) public {
+        _safeMint(to, tokenId);
+    }
+}
+
 
 contract BaseScript is Script {
   address deployerAddress;
   
-  address MULTISIG = 0xC92Bc86Ae8E0561A57d1FBA63B58447b0E24c58F;//0x201308B728ACb48413CD27EC60B4FfaC074c2D01; //change this to the deployed Safe address
-  address gxpl = 0x42069BaBe92462393FaFdc653A88F958B64EC9A3;
-  address token = 0x83824FcA8f15441812C6240e373821A84A5733Cb;
-  address auth = 0x5471F097f2f75F2731Ed513B45C2F9eF209D02DC;
-  address core = 0xC65e15d37F4f49cD30A47Fb8D27CCA4A6eb37b58;
-  address op = 0x8082871B3Ee9c4a1644545895ad9d0321d2b463b;
-  address veto = 0x97F53CB12eC6c20C176745Bf661597a70D0837cE;
-  address vote = 0x3ED21Eab9F55E993F9528E4ceEBDdA84Ac9b93AB;
+  address MULTISIG = 0xA52ccdee6105D758964ee55155Ced6c012eA0e89;//0xC92Bc86Ae8E0561A57d1FBA63B58447b0E24c58F;//0x201308B728ACb48413CD27EC60B4FfaC074c2D01; //change this to the deployed Safe address
+  address gxpl = 0xda0d1a30949b870a1FA7B2792B03070395720Da0;
   IGnosisSafe safe;
-  //borgCore core;
+  borgCore core;
   ejectImplant eject;
+  BorgAuth auth;
   optimisticGrantImplant opGrant;
   daoVoteGrantImplant voteGrant;
   daoVetoGrantImplant vetoGrant;
@@ -39,19 +51,18 @@ contract BaseScript is Script {
   failSafeImplant failSafe;
   MockERC20Votes govToken;
   FlexGov mockDao;
-  MetaVesT metaVesT;
-  MetaVesTController metaVesTController;
+  metavestController metaVesTController;
   FlexGovernanceAdapter governanceAdapter;
+  MultiUseSignCondition multiSignCondition;
+  MockWrapper mockWrapper;
 
      function run() public {
-            deployerAddress = vm.addr(vm.envUint("PRIVATE_KEY_DEPLOY"));
+                    deployerAddress = vm.addr(vm.envUint("PRIVATE_KEY_DEPLOY"));
             uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY_DEPLOY");
             vm.startBroadcast(deployerPrivateKey);
-            //BorgAuth(auth).updateRole(address(mockDao), 99);
-            borgCore(core).addFullAccessOrBlockContract(op);
-            borgCore(core).addFullAccessOrBlockContract(veto);
-            borgCore(core).addFullAccessOrBlockContract(vote);
-            vm.stopBroadcast();
+        core = borgCore(0xBdFC1c09057c3086ae95F14b4368679eb6b35716);
+        core.addFullAccessOrBlockContract(0xE995E85594f7533922002a6794219ec897971226);
+        vm.stopBroadcast();
         }
 
               function getSignature(

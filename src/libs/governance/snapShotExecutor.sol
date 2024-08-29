@@ -34,7 +34,7 @@ contract SnapShotExecutor is BorgAuthACL {
 
     //events
     event ProposalCreated(bytes32 indexed proposalId, address indexed target, uint256 value, bytes cdata, string description, uint256 timestamp);
-    event ProposalExecuted(bytes32 indexed proposalId, address indexed target, uint256 value, bytes cdata, string description, uint256 timestamp);
+    event ProposalExecuted(bytes32 indexed proposalId, address indexed target, uint256 value, bytes cdata, string description, uint256 timestamp, bool success);
     event ProposalCanceled(bytes32 indexed proposalId, address indexed target, uint256 value, bytes cdata, string description, uint256 timestamp);
     event VotedToCancel(address indexed voter, bytes32 proposalId);
 
@@ -71,8 +71,7 @@ contract SnapShotExecutor is BorgAuthACL {
         if (p.timestamp > block.timestamp) revert SnapShotExecutor_WaitingPeriod();
         if(p.target == address(0)) revert SnapShotExecutor_InvalidProposal();
         (bool success, bytes memory returndata) = p.target.call{value: p.value}(p.cdata);
-        Address.verifyCallResult(success, returndata);
-        emit ProposalExecuted(proposalId, p.target, p.value, p.cdata, p.description, p.timestamp);
+        emit ProposalExecuted(proposalId, p.target, p.value, p.cdata, p.description, p.timestamp, success);
         pendingProposalCount--;
         delete pendingProposals[proposalId];
       

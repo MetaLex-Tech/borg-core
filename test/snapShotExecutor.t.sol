@@ -162,6 +162,16 @@ contract BorgCoreTest is Test {
     //snapShotExecutor.execute(propId);
   }
 
+function testFailVetoSnapShotExecutorTransferTooMuch() public {
+    vm.prank(vip);
+    //execute transfer of 0.01 dai to owner;
+    bytes memory data = abi.encodeWithSelector(dai.transfer.selector, owner, 200000 ether);
+    bytes32 propId = snapShotExecutor.propose(address(dai), 0, data, "transfer");
+    vm.warp(block.timestamp + 2 days);
+    vm.prank(dao);
+    snapShotExecutor.execute(propId);
+  }
+
   function testFailVetoSnapShotExecutorTransfer() public {
     vm.prank(vip);
     //execute transfer of 0.01 dai to owner;

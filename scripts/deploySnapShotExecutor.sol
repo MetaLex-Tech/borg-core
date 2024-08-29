@@ -22,6 +22,7 @@ import "metavest/RestrictedTokenFactory.sol";
 import "../src/libs/governance/SnapShotExecutor.sol";
 import "../src/libs/governance/govAuthErc721Adapater.sol";
 import "forge-std/StdUtils.sol";
+import "../src/clients/psydao/MockWrapper.sol";
 
 contract TestableERC721 is MockERC721 {
     function mint(address to, uint256 tokenId) public {
@@ -53,6 +54,7 @@ contract BaseScript is Script {
   metavestController metaVesTController;
   FlexGovernanceAdapter governanceAdapter;
   MultiUseSignCondition multiSignCondition;
+  MockWrapper mockWrapper;
 
      function run() public {
             deployerAddress = vm.addr(vm.envUint("PRIVATE_KEY_DEPLOY"));
@@ -61,19 +63,21 @@ contract BaseScript is Script {
 
 
            
-            auth = new BorgAuth();
+            auth = BorgAuth(0x8B9eAeB684b33087978E3faB70975cF09d26bCe8);
 
           
-            TestableERC721 mockNFT = new TestableERC721();
-            mockNFT.initialize("testDAO", "DAO");
+            TestableERC721 mockNFT = TestableERC721(0x8450BDFA29Fd6B3b7BFc933cF910E17c2F947c9d);
+           // mockNFT.initialize("testDAO", "DAO");
 
-            mockNFT.mint(gxpl, 1);
+          //  mockNFT.mint(gxpl, 1);
            // mockNFT.transferFrom(address(this), gxpl, 1);
-            GovAuthErc721Adapter _adapter = new GovAuthErc721Adapter(address(mockNFT));
+          //  GovAuthErc721Adapter _adapter = new GovAuthErc721Adapter(address(mockNFT));
 
-            auth.setRoleAdapter(99, address(_adapter));
+          //  auth.setRoleAdapter(99, address(_adapter));
 
             SnapShotExecutor snapShotExecutor = new SnapShotExecutor(auth, address(MULTISIG), address(0x0C7f36ACF262eA3fCffE2d5392e19C19dF0538a0), 2 minutes, 2);
+
+            mockWrapper = new MockWrapper(address(gxpl), address(snapShotExecutor), address(MULTISIG));
 
             vm.stopBroadcast();
 
@@ -82,79 +86,8 @@ contract BaseScript is Script {
             console.log("MockNFT: ", address(mockNFT));
             console.log("snapshotAuth: ", address(auth));
             console.log("snapShotExecutor: ", address(snapShotExecutor));
+            console.log("MockWrapper: ", address(mockWrapper));
             return;
-            safe = IGnosisSafe(MULTISIG);
-            vm.startBroadcast(deployerPrivateKey);
-            governanceAdapter = new FlexGovernanceAdapter(auth, address(mockDao));
-            auth.updateRole(address(governanceAdapter), 98);
-
-            VestingAllocationFactory vestingFactory = new VestingAllocationFactory();
-            TokenOptionFactory tokenOptionFactory = new TokenOptionFactory();
-            RestrictedTokenFactory restrictedTokenFactory = new RestrictedTokenFactory();
-
-            metaVesTController = new metavestController(MULTISIG, MULTISIG, address(govToken), address(vestingFactory), address(tokenOptionFactory), address(restrictedTokenFactory));
-            vm.stopBroadcast();
-            address controllerAddr = address(metaVesTController);
-            vm.startBroadcast(deployerPrivateKey);
-
-
-            safe = IGnosisSafe(MULTISIG);
-            core = new borgCore(auth, 0x1, borgCore.borgModes.whitelist, "test-net-deploy-borg", address(safe));
-            failSafe = new failSafeImplant(auth, address(safe), deployerAddress);
-            eject = new ejectImplant(auth, MULTISIG, address(failSafe), false, true);
-            opGrant = new optimisticGrantImplant(auth, MULTISIG, address(metaVesTController));
-            auth.updateRole(address(opGrant), 98);
-
-            voteGrant = new daoVoteGrantImplant(auth, MULTISIG, 0, 10, 40, address(governanceAdapter), address(mockDao), address(metaVesTController));
-            auth.updateRole(address(voteGrant), 98);
-
-            //constructor(BorgAuth _auth, address _borgSafe, uint256 _duration, uint _quorum, uint256 _threshold, uint _waitingPeriod, address _governanceAdapter, address _governanceExecutor, address _metaVesT, address _metaVesTController) BaseImplant(_auth, _borgSafe) {
-            vetoGrant = new daoVetoGrantImplant(auth, MULTISIG, 600, 5, 10, 600, address(governanceAdapter), address(mockDao), address(metaVesTController));
-            auth.updateRole(address(vetoGrant), 98);
-
-            auth.updateRole(address(governanceAdapter), 98);
-            auth.updateRole(address(mockDao), 99);
-            auth.updateRole(address(eject), 99);
-            
-            executeSingle(getAddModule(address(opGrant)));
-            executeSingle(getAddModule(address(vetoGrant)));
-            executeSingle(getAddModule(address(voteGrant)));
-            executeSingle(getAddModule(address(eject)));
-            executeSingle(getAddModule(address(failSafe)));
-
-            //dao deploys the core, with the dao as the owner.
-            core.addFullAccessOrBlockContract(address(core));
-            core.addFullAccessOrBlockContract(address(safe));
-            core.addFullAccessOrBlockContract(address(opGrant));
-            core.addFullAccessOrBlockContract(address(vetoGrant));
-            core.addFullAccessOrBlockContract(address(voteGrant));
-            core.addFullAccessOrBlockContract(address(govToken));
-                                         
-            govToken.transfer(MULTISIG, 100000000000 * 10**18);
-            govToken.transfer(gxpl,      10000000000 * 10**18);
-            opGrant.setGrantLimits(10, 1728380215);
-            opGrant.addApprovedGrantToken(address(govToken), 1000000000 * 10**18, 50000000000 * 10**18);
-            vetoGrant.addApprovedGrantToken(address(govToken), 50000000000 * 10**18);
-            vetoGrant.updateDuration(1 hours);
-
-            //Set the core as the guard for the safe
-            executeSingle(getSetGuardData(address(MULTISIG)));
-            vm.stopBroadcast();
-            console.log("Deployed");
-            console.log("Addresses:");
-            console.log("Safe: ", MULTISIG);
-            console.log("Core: ", address(core));
-            console.log("Optimistic Grant: ", address(opGrant));
-            console.log("Vote Grant: ", address(voteGrant));
-            console.log("Veto Grant: ", address(vetoGrant));
-            console.log("Eject: ", address(eject));
-            console.log("FailSafe: ", address(failSafe));
-            console.log("Auth: ", address(auth));
-            console.log("Governance Adapter: ", address(governanceAdapter));
-            console.log("MetaVesT Controller: ", address(metaVesTController));
-            console.log("Mock DAO: ", address(mockDao));
-            console.log("Mock Gov Token: ", address(govToken));
-
 
         }
 
