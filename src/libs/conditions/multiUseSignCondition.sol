@@ -76,7 +76,6 @@ contract MultiUseSignCondition is BaseCondition {
     }
 
     function updateThreshold(uint256 _threshold) public onlyOwner {
-        if (!ISafe(BORG_SAFE).isOwner(msg.sender)) revert SignatureCondition_CallerNotSigner();
         if (_threshold == 0) revert SignatureCondition_InvalidZero();
         address[] memory _signers = ISafe(BORG_SAFE).getOwners();
          if (_threshold > _signers.length)

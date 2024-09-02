@@ -163,6 +163,7 @@ contract borgCore is BaseGuard, BorgAuthACL, IEIP4824 {
         external override onlySafe
     {
         // If Directors are required, check the signatures and guardian threshold
+        // This will only check up to the threshold number of signers maximum, no other signatures will be verified
         if (directorsRequired > 0) {
             if(!_checkDirectorsSignatures(
                 SignatureHelper.TransactionDetails(
