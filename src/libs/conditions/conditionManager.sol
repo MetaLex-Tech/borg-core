@@ -5,7 +5,8 @@ import "../../interfaces/ICondition.sol";
 import "openzeppelin/contracts/interfaces/IERC165.sol";
 import "../auth.sol";
 
-/// @title ConditionManager - A contract to manage multiple conditions for a contract
+/// @title  ConditionManager - A contract to manage multiple conditions for a contract
+/// @author MetaLeX Labs, Inc.
 contract ConditionManager is BorgAuthACL {
     /// @notice Logic enum, either 'AND' (all conditions must be true) or 'OR' (only one of the conditions must be true)
     enum Logic {

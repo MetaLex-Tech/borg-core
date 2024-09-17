@@ -4,7 +4,8 @@ pragma solidity 0.8.20;
 import "openzeppelin/contracts/interfaces/IERC165.sol";
 import "../../interfaces/ICondition.sol";
 
-/// @title BaseCondition - A contract that defines the interface for conditions
+/// @title  BaseCondition - A contract that defines the interface for conditions
+/// @author MetaLeX Labs, Inc.
 abstract contract BaseCondition is ICondition, IERC165  {
     bytes4 private constant _INTERFACE_ID_BASE_CONDITION = 0x8b94fce4;
 

@@ -10,7 +10,8 @@ pragma solidity 0.8.20;
 
 import "../interfaces/IAuthAdapter.sol";
 
-/// @title BorgAuth
+/// @title  BorgAuth
+/// @author MetaLeX Labs, Inc.
 /// @notice ACL with extensibility for different role hierarchies and custom adapters
 contract BorgAuth {
     //cosntants built-in roles, authority works as a hierarchy

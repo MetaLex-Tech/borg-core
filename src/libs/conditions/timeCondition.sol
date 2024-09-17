@@ -4,6 +4,7 @@ pragma solidity 0.8.20;
 import "./BaseCondition.sol";
 
 /// @title TimeCondition - A condition that checks if the current time is before or after a target time
+/// @author     MetaLeX Labs, Inc.
 contract TimeCondition is BaseCondition {
     // The target time for comparison, set at contract creation
     uint256 public immutable targetTime;

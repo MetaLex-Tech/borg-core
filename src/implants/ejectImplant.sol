@@ -11,8 +11,10 @@ interface IFailSafeImplant {
     function recoverSafeFunds() external;
 }
 
-/// @title ejectImplant - allows the DAO to have ownership controls over the BORG members on chain safe access
+/// @title  ejectImplant - allows the DAO to have ownership controls over the BORG members on chain safe access
 /// as well as the ability to self-eject from the BORG.
+/// @author MetaLeX Labs, Inc.
+
 contract ejectImplant is BaseImplant {
     // BORG Safe Implant ID
     uint256 public immutable IMPLANT_ID = 1;

@@ -4,7 +4,8 @@ pragma solidity 0.8.20;
 import "./BaseCondition.sol";
 import "../../interfaces/ISafe.sol";
 
-/// @title SignatureCondition - A condition that checks if a certain number of signers have signed
+/// @title  MultiUseSignatureCondition - A condition that checks if a certain number of signers have signed with different contract/method/data inputs
+/// @author MetaLeX Labs, Inc.
 contract MultiUseSignCondition is BaseCondition {
 
     // condition vars

@@ -21,8 +21,9 @@ interface AggregatorV3Interface {
     returns (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound);
 }
 
-/// @title ChainLinkOracleCondition
+/// @title  ChainLinkOracleCondition
 /// @notice Condition to check the price of an asset from a ChainLink Oracle
+/// @author MetaLeX Labs, Inc.
 contract ChainLinkOracleCondition is BaseCondition {
     // Conditional logic
     enum Condition {GREATER, EQUAL, LESS}

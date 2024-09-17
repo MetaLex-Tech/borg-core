@@ -3,7 +3,8 @@ pragma solidity 0.8.20;
 
 import "./BaseCondition.sol";
 
-/// @title SignatureCondition - A condition that checks if a certain number of signers have signed
+/// @title  SignatureCondition - A condition that checks if a certain number of signers have signed
+/// @author MetaLeX Labs, Inc.
 contract SignatureCondition is BaseCondition {
 
     // Enum to specify the logic of the condition, AND or OR

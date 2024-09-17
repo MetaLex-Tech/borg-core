@@ -4,7 +4,8 @@ pragma solidity 0.8.20;
 import "./BaseCondition.sol";
 import "forge-std/interfaces/IERC20.sol";
 
-/// @title BalanceCondition - A condition that checks the balance of a target address
+/// @title  BalanceCondition - A condition that checks the balance of a target address
+/// @author MetaLeX Labs, Inc.
 contract BalanceCondition is BaseCondition {
 
     // immutable variables

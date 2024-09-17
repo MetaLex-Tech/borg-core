@@ -11,6 +11,7 @@ import "./VoteImplant.sol";
 
 /// @title daoVoteGrantImplant - A module for creating grants for a BORG with full DAO approval via governence.
 /// The DAO must have a valid governance system in place to use this module.
+/// @author MetaLeX Labs, Inc.
 contract daoVoteGrantImplant is VoteImplant, ReentrancyGuard {
     // Implant ID
     uint256 public constant IMPLANT_ID = 4;

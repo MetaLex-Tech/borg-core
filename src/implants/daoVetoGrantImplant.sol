@@ -12,6 +12,7 @@ import "metavest/MetaVesTController.sol";
 
 /// @title daoVetoGrantImplan
 /// @notice This implant allows the BORG to grant time locked grants, vetoable by the DAO or authority.
+/// @author MetaLeX Labs, Inc.
 contract daoVetoGrantImplant is VetoImplant, ReentrancyGuard {
 
     // BORG Implant ID

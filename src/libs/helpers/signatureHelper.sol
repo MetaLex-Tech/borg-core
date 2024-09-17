@@ -9,6 +9,7 @@ interface IDomainSeparator {
 
 /**
     * @title SignatureHelper
+    * @author MetaLeX Labs, Inc.
     * @dev Helper contract to verify signatures of signed messages for Gnosis Safe's
     */
 contract SignatureHelper {

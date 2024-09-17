@@ -5,6 +5,7 @@ import "openzeppelin/contracts/interfaces/IERC165.sol";
 import "../../interfaces/IRecoveryHook.sol";
 
 /// @title BaseRecoveryHook - A contract that defines the interface for recovery hooks
+/// @author     MetaLeX Labs, Inc.
 abstract contract BaseRecoveryHook is IRecoveryHook, IERC165  {
 
     /// @notice Hook that is called after the recovery process has been completed

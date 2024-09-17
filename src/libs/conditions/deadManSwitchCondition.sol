@@ -3,7 +3,8 @@ pragma solidity 0.8.20;
 
 import "./BaseCondition.sol";
 
-/// @title DeadManSwitchCondition - A condition that checks if a specified delay time has passed and the Gnosis Safe nonce is unchanged
+/// @title  DeadManSwitchCondition - A condition that checks if a specified delay time has passed and the Gnosis Safe nonce is unchanged
+/// @author MetaLeX Labs, Inc.
 contract DeadManSwitchCondition is BaseCondition {
     uint256 public immutable DELAY_TIME;
     address public immutable BORG_SAFE;

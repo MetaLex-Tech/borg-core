@@ -4,7 +4,8 @@ pragma solidity 0.8.20;
 import "./baseGovernanceAdapater.sol";
 import "../../interfaces/IFlexGov.sol";
 
-/// @title FlexGovernanceAdapter
+/// @title  FlexGovernanceAdapter
+/// @author MetaLeX Labs, Inc.
 /// @notice Governance adapter for the Flexa DAO
 contract FlexGovernanceAdapter is BaseGovernanceAdapter {
     /// @notice Address of the governor contract

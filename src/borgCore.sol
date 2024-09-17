@@ -21,6 +21,7 @@ import "./libs/helpers/signatureHelper.sol";
 /**
  * @title      BorgCore
  *
+ * @author     MetaLeX Labs, Inc.
  * @notice     The BorgCore contract is a Gnosis Safe Guard that acts as a whitelist for recipients and contracts. It allows for the
  *             whitelisting of recipients and contracts, and the setting of transaction limits for recipients. It also allows for the
  *             setting of cooldown periods for native gas transfers and contract method calls. The contract also allows for the setting of

@@ -3,7 +3,8 @@ pragma solidity 0.8.20;
 
 import "./BaseCondition.sol";
 
-/// @dev Conforms to API3's dAPI and Airnode specs; see docs.api3.org, https://docs.api3.org/guides/dapis/read-a-dapi/;
+/// @dev    Conforms to API3's dAPI and Airnode specs; see docs.api3.org, https://docs.api3.org/guides/dapis/read-a-dapi/;
+/// @author MetaLeX Labs, Inc.
 /// import "@ api3/contracts/v0.8/interfaces/IProxy.sol";
 interface IProxy {
     function read() external view returns (int224 value, uint32 timestamp);

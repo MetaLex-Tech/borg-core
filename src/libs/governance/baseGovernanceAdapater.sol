@@ -2,7 +2,8 @@
 pragma solidity 0.8.20;
 import "../auth.sol";
 
-/// @title BaseGovernanceAdapter - A contract that defines the interface for governance adapters
+/// @title  BaseGovernanceAdapter - A contract that defines the interface for governance adapters
+/// @author MetaLeX Labs, Inc.
 abstract contract BaseGovernanceAdapter is BorgAuthACL {
     string public constant VERSION = "1.0.0";
     function createProposal(address[] memory targets, uint256[] memory values, bytes[] memory calldatas, string memory description, uint256 quorum, uint256 threshold,  uint256 duration) public virtual returns (uint256);

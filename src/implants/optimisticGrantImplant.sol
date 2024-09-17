@@ -7,7 +7,8 @@ import "forge-std/interfaces/IERC20.sol";
 import "metavest/MetaVesTController.sol";
 import "./baseImplant.sol";
 
-/// @title optimisticGrantImplant
+/// @title  optimisticGrantImplant
+/// @author MetaLeX Labs, Inc.
 /// @notice This implant allows for the BORG to create grants pre-approved by the DAO
 contract optimisticGrantImplant is BaseImplant, ReentrancyGuard { //is baseImplant
 
