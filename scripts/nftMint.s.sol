@@ -41,6 +41,7 @@ contract BaseScript is Script {
   address MULTISIG = 0xA52ccdee6105D758964ee55155Ced6c012eA0e89;//0xC92Bc86Ae8E0561A57d1FBA63B58447b0E24c58F;//0x201308B728ACb48413CD27EC60B4FfaC074c2D01; //change this to the deployed Safe address
   address gxpl = 0xda0d1a30949b870a1FA7B2792B03070395720Da0;
   address gabe = 0x9a6a12Efd98f90028F693B90F9cc7B093A0Ef516;
+  address pre = 0x362C117C919dEC312f58a11B866356c5DBF86687;
   IGnosisSafe safe;
   borgCore core;
   ejectImplant eject;
@@ -70,13 +71,13 @@ contract BaseScript is Script {
             TestableERC721 mockNFT = TestableERC721(0x8450BDFA29Fd6B3b7BFc933cF910E17c2F947c9d);
            // mockNFT.initialize("testDAO", "DAO");
 
-            mockNFT.mint(gxpl, 1);
+            mockNFT.mint(pre, 3);
            // mockNFT.transferFrom(address(this), gxpl, 1);
           //  GovAuthErc721Adapter _adapter = new GovAuthErc721Adapter(address(mockNFT));
 
           //  auth.setRoleAdapter(99, address(_adapter));
 
-            SnapShotExecutor snapShotExecutor = new SnapShotExecutor(auth, address(MULTISIG), address(0x0C7f36ACF262eA3fCffE2d5392e19C19dF0538a0), 2 minutes, 2, 99);
+       /*     SnapShotExecutor snapShotExecutor = new SnapShotExecutor(auth, address(MULTISIG), address(0x0C7f36ACF262eA3fCffE2d5392e19C19dF0538a0), 2 minutes, 2, 99);
 
             mockWrapper = new MockWrapper(address(gxpl), address(snapShotExecutor), address(MULTISIG));
 
@@ -87,7 +88,7 @@ contract BaseScript is Script {
             console.log("MockNFT: ", address(mockNFT));
             console.log("snapshotAuth: ", address(auth));
             console.log("snapShotExecutor: ", address(snapShotExecutor));
-            console.log("MockWrapper: ", address(mockWrapper));
+            console.log("MockWrapper: ", address(mockWrapper));*/
             return;
 
         }

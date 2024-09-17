@@ -12,6 +12,7 @@ contract SnapShotExecutor is BorgAuthACL {
     uint256 public threshold;
     uint256 public postVetoWaitingPeriod;
     uint256 public pendingProposalCount;
+    uint256 public pendingProposalLimit;
     
 
 
@@ -46,7 +47,7 @@ contract SnapShotExecutor is BorgAuthACL {
         _;
     }
 
-    constructor(BorgAuth _auth, address _borgSafe, address _oracle, uint256 _waitingPeriod, uint256 threshold) BorgAuthACL(_auth) {
+    constructor(BorgAuth _auth, address _borgSafe, address _oracle, uint256 _waitingPeriod, uint256 threshold, uint256 _pendingProposals) BorgAuthACL(_auth) {
         if(_borgSafe == address(0) || _oracle == address(0)) revert SnapShotExecutor_ZeroAddress();
         borgSafe = _borgSafe;
         oracle = _oracle;
@@ -54,11 +55,12 @@ contract SnapShotExecutor is BorgAuthACL {
         waitingPeriod = _waitingPeriod;
         if(threshold < 2) revert SnapShotExeuctor_InvalidParams();
         threshold = threshold;
+        pendingProposalLimit = _pendingProposals;
     }
 
     function propose(address target, uint256 value, bytes calldata cdata, string memory description) external onlyOracle() returns (bytes32) {
         if(block.timestamp < postVetoWaitingPeriod) revert SnapShotExecutor_WaitingPeriod();
-        if(pendingProposalCount>3) revert SnapShotExeuctor_TooManyPendingProposals();
+        if(pendingProposalCount>pendingProposalLimit) revert SnapShotExeuctor_TooManyPendingProposals();
         bytes32 proposalId = keccak256(abi.encodePacked(target, value, cdata, description));
         pendingProposals[proposalId] = proposal(target, value, cdata, description, block.timestamp + waitingPeriod);
         pendingProposalCount++;

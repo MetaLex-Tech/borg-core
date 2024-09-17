@@ -75,7 +75,7 @@ contract BorgCoreTest is Test {
 
     vm.prank(dao);
     //constructor(BorgAuth _auth, address _borgSafe, address _oracle, uint256 _waitingPeriod, uint256 threshold)
-    snapShotExecutor = new SnapShotExecutor(auth, address(MULTISIG), address(vip), 2 days, 2);
+    snapShotExecutor = new SnapShotExecutor(auth, address(MULTISIG), address(vip), 2 days, 2, 99);
 
     safe = IGnosisSafe(MULTISIG);
     core = new borgCore(auth, 0x1, borgCore.borgModes.unrestricted, 'borg-core-testing', address(safe));
