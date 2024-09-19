@@ -75,6 +75,7 @@ contract daoVoteImplant is VoteImplant, ReentrancyGuard {
     event ThresholdUpdated(uint256 threshold);
     event GovernanceAdapterUpdated(address governanceAdapter);
     event ExpirationTimeUpdated(uint256 expiryTime);
+    event ProposalDeleted(uint256 indexed proposalId);
 
     /// @notice Modifier to check caller is authorized to propose a transaction
     modifier onlyProposer() {
@@ -202,10 +203,10 @@ contract daoVoteImplant is VoteImplant, ReentrancyGuard {
         }
     }
 
-    function proposeTransaction(address _to, uint256 _value, bytes memory _data, string memory _desc) external onlyProposer {
-        uint256 proposalId = _createImplantProposal(_to, _value, _data);
-        emit ProposalCreated(proposalId, _to, _value, _data, _desc);
-        _createGovernanceVoteToExecuteProposalById(proposalId, _desc);
+    function proposeTransaction(address _to, uint256 _value, bytes memory _data, string memory _desc) external onlyProposer returns (uint256 newProposalId) {
+        newProposalId = _createImplantProposal(_to, _value, _data);
+        emit ProposalCreated(newProposalId, _to, _value, _data, _desc);
+        _createGovernanceVoteToExecuteProposalById(newProposalId, _desc);
     }
 
     /// @notice Internal View function to get a proposal
@@ -245,7 +246,6 @@ contract daoVoteImplant is VoteImplant, ReentrancyGuard {
 
         //delete the proposal
         _deleteProposal(_proposalId);
-        emit ProposalExecuted(_proposalId, proposal.to, proposal.value, proposal.cdata);
     }
 
     /// @notice Internal function to delete a proposal
@@ -260,6 +260,7 @@ contract daoVoteImplant is VoteImplant, ReentrancyGuard {
         }
         currentProposals.pop();
         delete proposalIndicesByProposalId[_proposalId];
+        emit ProposalDeleted(_proposalId);
     }
 
     /// @notice Get the details of a proposal

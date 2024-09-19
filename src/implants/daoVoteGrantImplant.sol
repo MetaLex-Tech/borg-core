@@ -85,6 +85,7 @@ contract daoVoteGrantImplant is VoteImplant, ReentrancyGuard {
     event MetaVesTControllerUpdated(address metaVesTController);
     event BorgVoteToggled(bool requireBorgVote);
     event ExpirationTimeUpdated(uint256 expiryTime);
+    event ProposalDeleted(uint256 indexed proposalId);
 
     /// @notice Modifier to check caller is authorized to propose a grant. If
     ///         `requireBorgVote` is true, then grants need to be co-approved by
@@ -366,6 +367,7 @@ contract daoVoteGrantImplant is VoteImplant, ReentrancyGuard {
         }
         currentProposals.pop();
         delete proposalIndicesByProposalId[_proposalId];
+        emit ProposalDeleted(_proposalId);
     }
 
     /// @notice Execute a proposal a direct grant, only callable by internal `.call()`

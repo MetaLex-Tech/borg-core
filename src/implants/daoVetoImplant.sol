@@ -76,7 +76,9 @@ contract daoVetoImplant is VetoImplant, ReentrancyGuard {
     event ThresholdUpdated(uint256 newThreshold);
     event GovernanceAdapterSet(address indexed governanceAdapter);
     event ProposalExecuted(uint256 indexed proposalId, address indexed target, uint256 value, bytes cdata);
+    event ProposalFailed(uint256 indexed proposalId, address indexed target, uint256 value, bytes cdata);
     event ExpirationTimeUpdated(uint256 newExpirationTime);
+    event ProposalDeleted(uint256 indexed proposalId);
 
     // Proposal Storage and mappings
     ImplantProposal[] public currentProposals;
@@ -109,6 +111,7 @@ contract daoVetoImplant is VetoImplant, ReentrancyGuard {
         quorum = _quorum;
         threshold = _threshold;
         cooldown = _cooldown;
+        lastProposalId=0;
         governanceAdapter = _governanceAdapter;
         governanceExecutor = _governanceExecutor;
     }
@@ -176,6 +179,7 @@ contract daoVetoImplant is VetoImplant, ReentrancyGuard {
         }
         currentProposals.pop();
         delete proposalIndicesByProposalId[_proposalId];
+        emit ProposalDeleted(_proposalId);
     }
 
     /// @notice Function to execute a proposal
@@ -195,10 +199,11 @@ contract daoVetoImplant is VetoImplant, ReentrancyGuard {
 
         bool success = ISafe(BORG_SAFE).execTransactionFromModule(proposal.to, proposal.value, proposal.cdata, Enum.Operation.Call);
         if(!success)
-            revert daoVetoImplant_ProposalExecutionError();
+            emit ProposalFailed(_proposalId, proposal.to, proposal.value, proposal.cdata);
+        else
+            emit ProposalExecuted(_proposalId, proposal.to, proposal.value, proposal.cdata);
 
         _deleteProposal(_proposalId);
-        emit ProposalExecuted(_proposalId, proposal.to, proposal.value, proposal.cdata);
     }
 
     /// @notice Internal View function to get a proposal

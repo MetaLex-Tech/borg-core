@@ -149,6 +149,10 @@ contract VoteBorgTest is Test {
     //dao deploys the core, with the dao as the owner.
     vm.prank(dao);
     core.addFullAccessOrBlockContract(address(core));
+    vm.prank(dao);
+    core.addFullAccessOrBlockContract(address(daoVeto));
+    vm.prank(dao);
+    core.addFullAccessOrBlockContract(address(daoVote));
 
 
     //Set the core as the guard for the safe
@@ -184,6 +188,90 @@ contract VoteBorgTest is Test {
     opGrant.createBasicGrant(dai_addr, address(jr), 2 ether);
 
     //executeSingle(getCreateGrant(address(dai), address(jr), 2 ether));
+  }
+
+  function testVoteImplant() public {
+     //   vm.prank(owner);
+        //propose a dai transfer transaction
+        //byte code for the transfer
+        bytes memory bytecode = abi.encodeWithSignature("transfer(address,uint256)", address(jr), 2 ether);
+
+        vm.prank(MULTISIG);
+        uint256 propId = daoVote.proposeTransaction(dai_addr, 0, bytecode, "Transfer 2 DAI to jr");
+        //vote on the proposal
+        vm.prank(address(mockDao));
+        daoVote.executeProposal(propId);
+        //executeSingle(getCreateGrant(address(dai), address(jr), 2 ether));
+  }
+
+    function testFailVoteImplant() public {
+     //   vm.prank(owner);
+        //propose a dai transfer transaction
+        //byte code for the transfer
+        bytes memory bytecode = abi.encodeWithSignature("transfer(address,uint256)", address(jr), 2 ether);
+
+        vm.prank(MULTISIG);
+        uint256 propId = daoVote.proposeTransaction(dai_addr, 0, bytecode, "Transfer 2 DAI to jr");
+        //vote on the proposal
+        vm.prank(address(MULTISIG));
+        daoVote.executeProposal(propId);
+        //executeSingle(getCreateGrant(address(dai), address(jr), 2 ether));
+  }
+
+    function testFailVoteImplantChange() public {
+     //   vm.prank(owner);
+        //propose a dai transfer transaction
+        //byte code for the transfer
+        bytes memory bytecode = abi.encodeWithSignature("transfer(address,uint256)", address(jr), 2 ether);
+
+        vm.prank(MULTISIG);
+        uint256 propId = daoVote.proposeTransaction(dai_addr, 0, bytecode, "Transfer 2 DAI to jr");
+        vm.prank(address(MULTISIG));
+        daoVote.setGovernanceExecutor(address(MULTISIG));
+        //vote on the proposal
+        vm.prank(address(MULTISIG));
+        daoVote.executeProposal(propId);
+        //executeSingle(getCreateGrant(address(dai), address(jr), 2 ether));
+  }
+
+
+  function testVetoImplant() public {
+     //   vm.prank(owner);
+        //propose a dai transfer transaction
+        //byte code for the transfer
+        bytes memory bytecode = abi.encodeWithSignature("transfer(address,uint256)", address(jr), 2 ether);
+
+        vm.prank(MULTISIG);
+        uint256 vetoPropId;
+        uint256 govPropId;
+        (vetoPropId, govPropId) = daoVeto.proposeTransaction(dai_addr, 0, bytecode, "Transfer 2 DAI to jr");
+        vm.warp(block.timestamp + 600 + 8 hours + 1);
+        //vote on the proposal
+        vm.prank(address(MULTISIG));
+        daoVeto.executeProposal(govPropId);
+        //executeSingle(getCreateGrant(address(dai), address(jr), 2 ether));
+  }
+
+  function testVetoImplantvetod() public {
+     //   vm.prank(owner);
+        //propose a dai transfer transaction
+        //byte code for the transfer
+        bytes memory bytecode = abi.encodeWithSignature("transfer(address,uint256)", address(jr), 2 ether);
+
+        vm.prank(MULTISIG);
+        uint256 vetoPropId;
+        uint256 govPropId;
+        (vetoPropId, govPropId) = daoVeto.proposeTransaction(dai_addr, 0, bytecode, "Transfer 2 DAI to jr");
+      //  console.log(daoVeto.currentProposals(0).id);
+        //vote on the proposal
+        vm.prank(address(mockDao));
+        daoVeto.deleteProposal(govPropId);
+
+        vm.warp(block.timestamp + 605);
+        vm.prank(address(MULTISIG));
+        vm.expectRevert();
+        daoVeto.executeProposal(govPropId);
+        //executeSingle(getCreateGrant(address(dai), address(jr), 2 ether));
   }
 
 
