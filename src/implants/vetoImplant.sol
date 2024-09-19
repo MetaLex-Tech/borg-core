@@ -12,6 +12,11 @@ abstract contract VetoImplant is BaseImplant, IVetoImplant {
         _;
     }
 
+    modifier onlyGovernanceOrBorg() {
+        if (msg.sender != governanceExecutor && msg.sender!= BORG_SAFE) revert CallerNotGovernance();
+        _;
+    }
+
     function setGovernanceExecutor(address _governanceExecutor) external onlyOwner {
         if (_governanceExecutor == address(0)) revert GovernanceExecutorEmpty();
         governanceExecutor = _governanceExecutor;
@@ -20,7 +25,7 @@ abstract contract VetoImplant is BaseImplant, IVetoImplant {
 
     /// @notice Function to delete proposal called only by governance executor
     /// @param _proposalId The proposal ID
-    function deleteProposal(uint256 _proposalId) external onlyGovernance {
+    function deleteProposal(uint256 _proposalId) external onlyGovernanceOrBorg {
         _deleteProposal(_proposalId);
     }
 
