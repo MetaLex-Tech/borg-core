@@ -247,7 +247,7 @@ contract VoteBorgTest is Test {
         (vetoPropId, govPropId) = daoVeto.proposeTransaction(dai_addr, 0, bytecode, "Transfer 2 DAI to jr");
         vm.warp(block.timestamp + 600 + 8 hours + 1);
         //vote on the proposal
-        vm.prank(address(MULTISIG));
+        vm.prank(address(owner));
         daoVeto.executeProposal(govPropId);
         //executeSingle(getCreateGrant(address(dai), address(jr), 2 ether));
   }
@@ -268,7 +268,7 @@ contract VoteBorgTest is Test {
         daoVeto.deleteProposal(govPropId);
 
         vm.warp(block.timestamp + 605);
-        vm.prank(address(MULTISIG));
+        vm.prank(address(owner));
         vm.expectRevert();
         daoVeto.executeProposal(govPropId);
         //executeSingle(getCreateGrant(address(dai), address(jr), 2 ether));

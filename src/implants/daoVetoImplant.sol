@@ -186,8 +186,11 @@ contract daoVetoImplant is VetoImplant, ReentrancyGuard {
     /// @param _proposalId The proposal ID
     /// @dev Only callable by an active BORG member
     function executeProposal(uint256 _proposalId)
-        external onlyBorg nonReentrant
+        external nonReentrant
     {   
+        if(!ISafe(BORG_SAFE).isOwner(msg.sender))
+            revert daoVetoGrantImplant_CallerNotBORGMember();
+            
         ImplantProposal memory proposal = _getProposal(_proposalId);
 
         if(proposal.startTime + proposal.duration + gracePeriod > block.timestamp)
