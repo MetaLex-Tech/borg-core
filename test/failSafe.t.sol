@@ -14,7 +14,7 @@ import "../src/libs/hooks/ExampleRecoveryHookRevert.sol";
 
 contract FailSafeImplantTest is Test {
     IGnosisSafe safe;
-    address MULTISIG = 0xee1927e3Dbba7f261806e3B39FDE9aFacaA8cde7;//0x201308B728ACb48413CD27EC60B4FfaC074c2D01; //change this to the deployed Safe address
+    address MULTISIG = 0x201308B728ACb48413CD27EC60B4FfaC074c2D01;//0x201308B728ACb48413CD27EC60B4FfaC074c2D01; //change this to the deployed Safe address
     borgCore core;
     BorgAuth auth;
     failSafeImplant failSafe;
@@ -33,7 +33,7 @@ contract FailSafeImplantTest is Test {
     IMultiSendCallOnly(0xd34C0841a14Cd53428930D4E0b76ea2406603B00); //make sure this matches your chain
 
     function setUp() public {
-        safe = IGnosisSafe(0xee1927e3Dbba7f261806e3B39FDE9aFacaA8cde7);
+        safe = IGnosisSafe(0x201308B728ACb48413CD27EC60B4FfaC074c2D01);
         vm.prank(dao);
         auth = new BorgAuth();
         core = new borgCore(auth, 0x1, borgCore.borgModes.whitelist, 'fail-safe-testing', address(safe));
