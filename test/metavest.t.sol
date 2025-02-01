@@ -1156,16 +1156,6 @@ contract MetaVestTest is Test {
     uint256 a = 1;
     assertEq(a,1);
     vm.startPrank(MULTISIG);
-     BaseAllocation.Allocation memory allocation = BaseAllocation.Allocation({
-            tokenContract: address(mockERC20),
-            tokenStreamTotal: 0,
-            vestingCliffCredit: 0,
-            unlockingCliffCredit: 0,
-            vestingRate: 0,
-            vestingStartTime: uint48(block.timestamp),
-            unlockRate: 0,
-            unlockStartTime: uint48(block.timestamp)
-        });
 
         uint256[] memory unlockTimes = new uint256[](17);
         
@@ -1189,16 +1179,30 @@ contract MetaVestTest is Test {
 
         MultiTimeCondition mt = new MultiTimeCondition(MULTISIG, unlockTimes);
 
+        BaseAllocation.Allocation memory allocation = BaseAllocation.Allocation({
+            tokenContract: address(mockERC20),
+            tokenStreamTotal: 0,
+            vestingCliffCredit: 0,
+            unlockingCliffCredit: 0,
+            vestingRate: 0,
+            vestingStartTime: uint48(block.timestamp),
+            unlockRate: 0,
+            unlockStartTime: uint48(block.timestamp)
+        });
+
+
         address[] memory conditionContracts = new address[](1);
         conditionContracts[0] = address(mt);
 
-        BaseAllocation.Milestone[] memory milestones = new BaseAllocation.Milestone[](1);
-        milestones[0] = BaseAllocation.Milestone({
-            milestoneAward: 1000e18,
-            unlockOnCompletion: true,
-            complete: false,
-            conditionContracts: conditionContracts
-        });
+        BaseAllocation.Milestone[] memory milestones = new BaseAllocation.Milestone[](17);
+        for(uint256 i = 0; i < 17; i++){
+            milestones[i] = BaseAllocation.Milestone({
+                milestoneAward: 10e18,
+                unlockOnCompletion: true,
+                complete: false,
+                conditionContracts: conditionContracts
+            });
+        }
 
         mockERC20.approve(address(controller), 2100e23);
 
@@ -1215,6 +1219,38 @@ contract MetaVestTest is Test {
             0
         );
         vm.stopPrank();
+
+        vm.startPrank(grantee);
+      
+        uint256 withdrawable = BaseAllocation(vest).getAmountWithdrawable();
+        vm.expectRevert();
+        BaseAllocation(vest).withdraw(withdrawable);
+        vm.stopPrank();
+
+        vm.warp(1738846800);
+        vm.startPrank(grantee);
+        BaseAllocation(vest).confirmMilestone(0);
+        BaseAllocation(vest).withdraw(BaseAllocation(vest).getAmountWithdrawable());
+         withdrawable = BaseAllocation(vest).getAmountWithdrawable();
+        vm.expectRevert();
+        BaseAllocation(vest).withdraw(withdrawable);
+        vm.stopPrank();
+
+        vm.warp(1741266000);
+        vm.startPrank(grantee);
+         BaseAllocation(vest).confirmMilestone(1);
+        BaseAllocation(vest).withdraw(BaseAllocation(vest).getAmountWithdrawable());
+        vm.stopPrank();
+
+        vm.warp(1743944399);
+        vm.startPrank(grantee);
+        vm.expectRevert();
+        BaseAllocation(vest).confirmMilestone(2);
+        vm.warp(1743944400);
+        BaseAllocation(vest).confirmMilestone(2);
+        BaseAllocation(vest).withdraw(BaseAllocation(vest).getAmountWithdrawable());
+        vm.stopPrank();
+
 
   }
 
