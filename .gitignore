@@ -6,3 +6,8 @@ broadcast/
 
 .DS_Store
 /broadcast_bk
+.gas-snapshot
+constructor-args.json
+foundry.toml
+foundry.toml
+test-command.txt
