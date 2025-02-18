@@ -1110,14 +1110,14 @@ contract MetaVestTest is Test {
     IMultiSendCallOnly(0xd34C0841a14Cd53428930D4E0b76ea2406603B00); //make sure this matches your chain
 
   // Set&pull our addresses for the tests. This is set for forked Arbitrum mainnet
-  address MULTISIG = 0x201308B728ACb48413CD27EC60B4FfaC074c2D01;//0x201308B728ACb48413CD27EC60B4FfaC074c2D01; //change this to the deployed Safe address
+  address MULTISIG = 0x709b1B5D0FDC75caCe1Eb7f6aa00873F2f2cBC27;//0x201308B728ACb48413CD27EC60B4FfaC074c2D01; //change this to the deployed Safe address
   address owner = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266; //owner of the safe protaganist
   address jr = 0xe31e00cb74deF9194D95F70ca938403064480A2f; //"junior" antagonist
   address vip = 0xC2ab7443999c32498e7B0295335025e549515025; //vip address that has a lot of voting power in the test governance token
   address usdc_addr = 0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238;//0xaf88d065e77c8cC2239327C5EDb3A432268e5831; //make sure this matches your chain
   address dai_addr = 0x3e622317f8C93f7328350cF0B56d9eD4C620C5d6;//0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1; //make sure this matches your chain
   address arb_addr = 0x912CE59144191C1204E64559FE8253a0e49E6548; //arb token
-
+ address clearMultisig = 0x709b1B5D0FDC75caCe1Eb7f6aa00873F2f2cBC27;
  // represents the DAO's On chain power address
   address dao = address(0xDA0);
 
@@ -1127,6 +1127,9 @@ contract MetaVestTest is Test {
   ERC20 arb;// = ERC20(arb);
   metavestController controller;  
   MockERC20Stable mockERC20;
+  BaseAllocation.Allocation allocation;
+  MultiTimeCondition mt;
+  uint256[] unlockTimes;
   /// Set our initial state: (All other tests are in isolation but share this state)
   /// 1. Set up the safe
   /// 2. Set up the core with the safe as the owner
@@ -1149,15 +1152,10 @@ contract MetaVestTest is Test {
 
     controller = new metavestController(MULTISIG, MULTISIG, address(new VestingAllocationFactory()), address(new TokenOptionFactory()), address(new RestrictedTokenFactory()));
     deal(address(mockERC20), address(this), 1000000e18);
- 
-  }
 
-  function testClear() public {
-    uint256 a = 1;
-    assertEq(a,1);
-    vm.startPrank(MULTISIG);
+       vm.startPrank(MULTISIG);
 
-        uint256[] memory unlockTimes = new uint256[](17);
+        unlockTimes = new uint256[](17);
         
         unlockTimes[0] = 1738846800;
         unlockTimes[1] = 1741266000;
@@ -1177,9 +1175,9 @@ contract MetaVestTest is Test {
         unlockTimes[15] = 1778072400;
         unlockTimes[16] = 1780750800;
 
-        MultiTimeCondition mt = new MultiTimeCondition(MULTISIG, unlockTimes);
+        mt = new MultiTimeCondition(MULTISIG, unlockTimes);
 
-        BaseAllocation.Allocation memory allocation = BaseAllocation.Allocation({
+       allocation = BaseAllocation.Allocation({
             tokenContract: address(mockERC20),
             tokenStreamTotal: 0,
             vestingCliffCredit: 0,
@@ -1203,12 +1201,118 @@ contract MetaVestTest is Test {
                 conditionContracts: conditionContracts
             });
         }
+    vm.stopPrank();
+ 
+  }
 
-        mockERC20.approve(address(controller), 2100e23);
+  function testClearClaims() public {
+
+   
+    address clearGrantee = 0xD4ca0fB58552876dF6E9422dCFC5B07b0dB2c229;
+    address _metavestController = 0xB46ce29C2C88b1983386c0a1709FEAb155d7c0B4;
+    address conditionContract = 0x10F12518679A8ebeF24373C8184d057a5cBcbe96;
+    address _clearToken = 0x58b9cB810A68a7f3e1E4f8Cb45D1B9B3c79705E8;
+    ERC20 clearToken = ERC20(_clearToken);
+    metavestController control = metavestController(_metavestController);
+
+    vm.startPrank(clearMultisig);
+
+    //approve the token for use
+    clearToken.approve(address(control), 2100e25);
+
+    //create the first grant to test
+    address[] memory conditionContracts = new address[](1);
+    conditionContracts[0] = conditionContract;
+    BaseAllocation.Milestone[] memory milestones = new BaseAllocation.Milestone[](17);
+        for(uint256 i = 0; i < 17; i++){
+            milestones[i] = BaseAllocation.Milestone({
+                milestoneAward: 1842105263157900000000000,
+                unlockOnCompletion: true,
+                complete: false,
+                conditionContracts: conditionContracts
+            });
+        }
+
+      BaseAllocation.Allocation memory _allocation = BaseAllocation.Allocation({
+            tokenContract: address(clearToken),
+            tokenStreamTotal: 0,
+            vestingCliffCredit: 0,
+            unlockingCliffCredit: 0,
+            vestingRate: 0,
+            vestingStartTime: uint48(block.timestamp),
+            unlockRate: 0,
+            unlockStartTime: uint48(block.timestamp)
+        });
+
+    address vest = control.createMetavest(
+            metavestController.metavestType.Vesting,
+            clearGrantee,
+            _allocation,
+            milestones,
+            0,
+            address(0),
+            0,
+            0
+        );
+        vm.stopPrank();
+
+        //now test the withdraws as the user. The first timestamp is the same block as the grant creation.
+        vm.startPrank(clearGrantee);
+        //check total tokens for vote power
+        console.log("totalTokens", BaseAllocation(vest).totalTokens());
+        uint256 withdrawable = 0;
+        //loop through 17 milestones
+        for(uint256 i = 0; i < 17; i++){
+            console.log("Checking unlocking milstone: ", i);
+            //check amount withdrawable
+            withdrawable = BaseAllocation(vest).getAmountWithdrawable();
+            console.log("withdrawable:", withdrawable);
+            //expect a revert because we haven't reached the milestone timestamp
+            console.log("Timestamp: ", block.timestamp);
+            vm.expectRevert();
+            BaseAllocation(vest).confirmMilestone(i);
+            console.log("Milestone unlock failed");
+            //warp to the milestone timestamp
+            
+            vm.warp(unlockTimes[i]+1);
+            console.log("Warp to milestone timestamp");
+            console.log("Timestamp: ", block.timestamp);
+            //this should now confirm the milestone, unlocking the tokens for the user
+            BaseAllocation(vest).confirmMilestone(i);
+            console.log("Milestone confirmed");
+            withdrawable = BaseAllocation(vest).getAmountWithdrawable();
+            console.log("withdrawable:", withdrawable);
+        }
+   
+    BaseAllocation(vest).withdraw(BaseAllocation(vest).getAmountWithdrawable());
+    
+    vm.stopPrank();
+  }
+
+  function testClear() public {
+    uint256 a = 1;
+    assertEq(a,1);
+    vm.startPrank(MULTISIG);
+
+        address[] memory conditionContracts = new address[](1);
+        conditionContracts[0] = address(mt);
+
+        BaseAllocation.Milestone[] memory milestones = new BaseAllocation.Milestone[](17);
+        for(uint256 i = 0; i < 17; i++){
+            milestones[i] = BaseAllocation.Milestone({
+                milestoneAward: 10e18,
+                unlockOnCompletion: true,
+                complete: false,
+                conditionContracts: conditionContracts
+            });
+        }
+
+        mockERC20.approve(address(controller), 2100e25);
 
         address grantee = address(0xdeadbabe);
-
-        address vest = controller.createMetavest(
+    address vest;
+    for(uint256 i = 0; i < 10; i++){
+         vest = controller.createMetavest(
             metavestController.metavestType.Vesting,
             grantee,
             allocation,
@@ -1218,9 +1322,12 @@ contract MetaVestTest is Test {
             0,
             0
         );
+    }
         vm.stopPrank();
 
         vm.startPrank(grantee);
+
+        console.log("totalTokens", BaseAllocation(vest).totalTokens());
       
         uint256 withdrawable = BaseAllocation(vest).getAmountWithdrawable();
         vm.expectRevert();
@@ -1252,6 +1359,41 @@ contract MetaVestTest is Test {
         vm.stopPrank();
 
 
+  }
+
+  function testDeployGas() public {
+     vm.startPrank(MULTISIG);
+
+        address[] memory conditionContracts = new address[](1);
+        conditionContracts[0] = address(mt);
+
+        BaseAllocation.Milestone[] memory milestones = new BaseAllocation.Milestone[](17);
+        for(uint256 i = 0; i < 17; i++){
+            milestones[i] = BaseAllocation.Milestone({
+                milestoneAward: 10e18,
+                unlockOnCompletion: true,
+                complete: false,
+                conditionContracts: conditionContracts
+            });
+        }
+
+        mockERC20.approve(address(controller), 2100e25);
+
+        address grantee = address(0xdeadbabe);
+    address vest;
+    for(uint256 i = 0; i < 7; i++){
+         vest = controller.createMetavest(
+            metavestController.metavestType.Vesting,
+            grantee,
+            allocation,
+            milestones,
+            0,
+            address(0),
+            0,
+            0
+        );
+    }
+        vm.stopPrank();
   }
 
   /// @dev Initial Check that the safe and owner are set correctly.
