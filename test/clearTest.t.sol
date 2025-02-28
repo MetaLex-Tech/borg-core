@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-pragma solidity ^0.8.20;
-
-import {Script} from "forge-std/Script.sol";
+pragma solidity 0.8.20;
+import "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
 import {borgCore} from "../src/borgCore.sol";
 import {ejectImplant} from "../src/implants/ejectImplant.sol";
@@ -23,7 +22,7 @@ import {IERC20} from "openzeppelin/contracts/interfaces/IERC20.sol";
 import {SnapShotExecutor} from "../src/libs/governance/snapShotExecutor.sol";
 
 
-contract BaseScript is Script {
+contract clearBorgTest is Test {
   address deployerAddress;
   address agentAddress;
   bytes32 constant DETERMINISTIC_DEPLOY_SALT = 0x0000000000000000000000000000000000000000000000000000000000004aa8;//0x0000000000000000000000000000000000000000000000000000000000369eb8;
@@ -56,18 +55,18 @@ contract BaseScript is Script {
     uint32 constant VOTING_PERIOD = 3 days; // 3 days voting period
     uint256 constant QUORUM_PERCENTAGE = 5; // 10% quorum
 
-     function run() public {
-            deployerAddress = vm.addr(vm.envUint("PRIVATE_KEY_MAIN"));
+  function setUp() public {
+ deployerAddress = vm.addr(vm.envUint("PRIVATE_KEY_MAIN"));
             uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY_MAIN");
-            vm.startBroadcast(deployerPrivateKey);
+            vm.startPrank(owner);
 
 
             auth = new BorgAuth();
             auth.updateRole(address(eject), 99);
 
-            vm.stopBroadcast();
+    
             safe = IGnosisSafe(MULTISIG);
-            vm.startBroadcast(deployerPrivateKey);
+
 
 
             core = new borgCore(auth, 0x2, borgCore.borgModes(1), "EVERCLEAR GRANTS BORG", address(safe));
@@ -89,7 +88,7 @@ contract BaseScript is Script {
 
             //deadmanswitch on failsafe.
             DeadManSwitchCondition deadManSwitch = new DeadManSwitchCondition(182.5 days, address(safe), deadSigners);
- 
+
 
             failSafe.addConditionToFunction(ConditionManager.Logic.AND,  address(deadManSwitch), bytes4(keccak256("recoverSafeFundsERC20(address)")));
             failSafe.addConditionToFunction(ConditionManager.Logic.AND,  address(deadManSwitch), bytes4(keccak256("recoverSafeFundsERC721(address,uint256)")));
@@ -102,25 +101,20 @@ contract BaseScript is Script {
             executeSingle(getAddModule(address(failSafe)));
             executeSingle(getAddModule(address(eject)));
 
-           // executeSingle(getAddOwner(address(MULTISIG), address(deployerAddress)));    
+
 
             //auth.zeroOwner();
             //Set the core as the guard for the safe
             executeSingle(getSetGuardData(address(MULTISIG)));
-
-            
-           // executeSingle(getDisableModule(address(MULTISIG), address(failSafe), address(eject)));
+          //  executeSingle(getDisableModule(address(MULTISIG), address(failSafe), address(eject)));
             executeSingle(getAddOwner(address(MULTISIG), address(Arjun)));
             executeSingle(getAddOwner(address(MULTISIG), address(MaxK)));
             executeSingle(getAddOwner(address(MULTISIG), address(Dima)));
             executeSingle(getAddOwner(address(MULTISIG), address(Ministro)));
             executeSingle(getAddOwner(address(MULTISIG), address(Facu)));
             executeSingle(getAddOwner(address(MULTISIG), address(Stefan)));
-            executeSingle(getChangeThreshold(address(MULTISIG), 4));
-            eject.selfEject(false);
             deadManSwitch.initiateTimeDelay();
 
-            vm.stopBroadcast();
             console.log("Deployed");
             console.log("Addresses:");
             console.log("Safe: ", MULTISIG);
@@ -130,10 +124,214 @@ contract BaseScript is Script {
             console.log("deadManSwitch: ", address(deadManSwitch));
             console.log("Auth: ", address(auth));
             console.log("snapShotExecutor: ", address(snapShotExecutor));
+            vm.stopPrank();
+  }
 
-        }
 
-    function getSignature(
+  /// @dev Initial Check that the safe and owner are set correctly.
+  function testOwner() public { 
+  assertEq(safe.isOwner(owner), true);
+  }
+
+  function testDeadManSwitch() public {
+    vm.startPrank(address(snapShotExecutor));
+    vm.warp(block.timestamp + 300 days);
+    failSafe.recoverSafeFunds();
+    vm.stopPrank();
+  }
+
+  function testEject() public {
+    vm.startPrank(address(owner));
+    eject.selfEject(false);
+    vm.stopPrank();
+  }
+
+  function testSwapOwner() public {
+    vm.startPrank(address(snapShotExecutor));
+    eject.swapOwner(owner, address(0xdeadbabe));
+    vm.stopPrank();
+  }
+
+    /* TEST METHODS */
+    //This section needs refactoring (!!) but going for speed here..
+    function createTestBatch() public returns (GnosisTransaction[] memory) {
+    GnosisTransaction[] memory batch = new GnosisTransaction[](2);
+    address guyToApprove = address(0xdeadbabe);
+    address token = 0xF17A3fE536F8F7847F1385ec1bC967b2Ca9caE8D;
+
+    // set guard
+    bytes4 setGuardFunctionSignature = bytes4(
+        keccak256("setGuard(address)")
+    );
+
+     bytes memory guardData = abi.encodeWithSelector(
+        setGuardFunctionSignature,
+        address(core)
+    );
+
+    batch[0] = GnosisTransaction({to: address(safe), value: 0, data: guardData});
+
+    bytes4 approveFunctionSignature = bytes4(
+        keccak256("approve(address,uint256)")
+    );
+    // Approve Tx -- this will go through as its a multicall before the guard is set for checkTx. 
+    uint256 wad2 = 200;
+    bytes memory approveData2 = abi.encodeWithSelector(
+        approveFunctionSignature,
+        guyToApprove,
+        wad2
+    );
+    batch[1] = GnosisTransaction({to: token, value: 0, data: approveData2});
+
+    return batch;
+}
+
+  function getSetGuardData(address to) public view returns (GnosisTransaction memory) {
+    bytes4 setGuardFunctionSignature = bytes4(
+        keccak256("setGuard(address)")
+    );
+
+     bytes memory guardData = abi.encodeWithSelector(
+        setGuardFunctionSignature,
+        address(core)
+    );
+    GnosisTransaction memory txData = GnosisTransaction({to: to, value: 0, data: guardData});
+    return txData;
+  }
+
+  function getTransferData(address token, address to, uint256 amount) public view returns (GnosisTransaction memory) {
+        bytes4 transferFunctionSignature = bytes4(
+            keccak256("transfer(address,uint256)")
+        );
+
+        bytes memory transferData = abi.encodeWithSelector(
+            transferFunctionSignature,
+            to,
+            amount
+        );
+        GnosisTransaction memory txData = GnosisTransaction({to: token, value: 0, data: transferData});
+        return txData;
+    }
+
+   function getNativeTransferData(address to, uint256 amount) public view returns (GnosisTransaction memory) {
+
+        bytes memory transferData;
+
+        GnosisTransaction memory txData = GnosisTransaction({to: to, value: amount, data: transferData});
+        return txData;
+    }
+
+    function getAddContractGuardData(address to, address allow, uint256 amount) public view returns (GnosisTransaction memory) {
+        bytes4 addContractMethod = bytes4(
+            keccak256("addContract(address,uint256)")
+        );
+
+        bytes memory guardData = abi.encodeWithSelector(
+            addContractMethod,
+            address(allow),
+            amount
+        );
+        GnosisTransaction memory txData = GnosisTransaction({to: to, value: 0, data: guardData}); 
+        return txData;
+    }
+
+    function getAddModule(address to) public view returns (GnosisTransaction memory) {
+        bytes4 addContractMethod = bytes4(
+            keccak256("enableModule(address)")
+        );
+
+        bytes memory guardData = abi.encodeWithSelector(
+            addContractMethod,
+            to
+        );
+        GnosisTransaction memory txData = GnosisTransaction({to: address(safe), value: 0, data: guardData}); 
+        return txData;
+    }
+
+    function addOwner(address toAdd) public view returns (GnosisTransaction memory) {
+        bytes4 addContractMethod = bytes4(
+            keccak256("addOwnerWithThreshold(address,uint256)")
+        );
+
+        bytes memory guardData = abi.encodeWithSelector(
+            addContractMethod,
+            toAdd,
+            1
+        );
+        GnosisTransaction memory txData = GnosisTransaction({to: address(safe), value: 0, data: guardData}); 
+        return txData;
+    }
+
+
+    function getAddRecepientGuardData(address to, address allow, uint256 amount) public view returns (GnosisTransaction memory) {
+        bytes4 addRecepientMethod = bytes4(
+            keccak256("addRecepient(address,uint256)")
+        );
+
+        bytes memory recData = abi.encodeWithSelector(
+            addRecepientMethod,
+            address(allow),
+            amount
+        );
+        GnosisTransaction memory txData = GnosisTransaction({to: to, value: 0, data: recData}); 
+        return txData;
+    }
+
+    function getRemoveRecepientGuardData(address to, address allow) public view returns (GnosisTransaction memory) {
+        bytes4 removeRecepientMethod = bytes4(
+            keccak256("removeRecepient(address)")
+        );
+
+        bytes memory recData = abi.encodeWithSelector(
+            removeRecepientMethod,
+            address(allow)
+        );
+        GnosisTransaction memory txData = GnosisTransaction({to: to, value: 0, data: recData}); 
+        return txData;
+    }
+
+    function getRemoveContractGuardData(address to, address allow) public view returns (GnosisTransaction memory) {
+        bytes4 removeContractMethod = bytes4(
+            keccak256("removeContract(address)")
+        );
+
+        bytes memory recData = abi.encodeWithSelector(
+            removeContractMethod,
+            address(allow)
+        );
+        GnosisTransaction memory txData = GnosisTransaction({to: to, value: 0, data: recData}); 
+        return txData;
+    }
+
+        function getAddOwner(address to, address owner) public view returns (GnosisTransaction memory) {
+    bytes4 addOwnerFunctionSignature = bytes4(
+        keccak256("addOwnerWithThreshold(address,uint256)")
+    );
+    bytes memory ownerData = abi.encodeWithSelector(
+        addOwnerFunctionSignature,
+        owner,
+        1
+    );
+
+    GnosisTransaction memory txData = GnosisTransaction({to: to, value: 0, data: ownerData});
+    return txData;
+    
+  }
+
+  function getDisableModule(address to, address module, address prevModule) public view returns (GnosisTransaction memory) {
+    bytes4 disableModuleFunctionSignature = bytes4(
+        keccak256("disableModule(address,address)")
+    );
+    bytes memory moduleData = abi.encodeWithSelector(
+        disableModuleFunctionSignature,
+        prevModule,
+        module
+    );
+    GnosisTransaction memory txData = GnosisTransaction({to: to, value: 0, data: moduleData});
+    return txData;
+  }
+
+      function getSignature(
         address to,
         uint256 value,
         bytes memory data,
@@ -164,6 +362,8 @@ contract BaseScript is Script {
         return signature;
     }
 
+
+
     function executeSingle(GnosisTransaction memory tx) public {
         executeData(tx.to, 0, tx.data);
     }
@@ -172,71 +372,7 @@ contract BaseScript is Script {
         executeData(tx.to, 0, tx.data, value);
     }
 
-    function getAddModule(address to) public view returns (GnosisTransaction memory) {
-    bytes4 addContractMethod = bytes4(
-        keccak256("enableModule(address)")
-    );
-
-    bytes memory guardData = abi.encodeWithSelector(
-        addContractMethod,
-        to
-    );
-    GnosisTransaction memory txData = GnosisTransaction({to: address(safe), value: 0, data: guardData}); 
-    return txData;
-    }
-    
-    function getSetGuardData(address to) public view returns (GnosisTransaction memory) {
-    bytes4 setGuardFunctionSignature = bytes4(
-        keccak256("setGuard(address)")
-    );
-
-     bytes memory guardData = abi.encodeWithSelector(
-        setGuardFunctionSignature,
-        address(core)
-    );
-    GnosisTransaction memory txData = GnosisTransaction({to: to, value: 0, data: guardData});
-    return txData;
-  }
-
-    function getAddOwner(address to, address owner) public view returns (GnosisTransaction memory) {
-    bytes4 addOwnerFunctionSignature = bytes4(
-        keccak256("addOwnerWithThreshold(address,uint256)")
-    );
-    bytes memory ownerData = abi.encodeWithSelector(
-        addOwnerFunctionSignature,
-        owner,
-        1
-    );
-
-    GnosisTransaction memory txData = GnosisTransaction({to: to, value: 0, data: ownerData});
-    return txData;
-    
-  }
-
-  function getDisableModule(address to, address module, address prevModule) public view returns (GnosisTransaction memory) {
-    bytes4 disableModuleFunctionSignature = bytes4(
-        keccak256("disableModule(address,address)")
-    );
-    bytes memory moduleData = abi.encodeWithSelector(
-        disableModuleFunctionSignature,
-        prevModule,
-        module
-    );
-    GnosisTransaction memory txData = GnosisTransaction({to: to, value: 0, data: moduleData});
-    return txData;
-  }
-
-  function getChangeThreshold(address to, uint256 threshold) public view returns (GnosisTransaction memory) {
-    bytes4 changeThresholdFunctionSignature = bytes4(
-        keccak256("changeThreshold(uint256)")
-    );
-    bytes memory thresholdData = abi.encodeWithSelector(
-        changeThresholdFunctionSignature,
-        threshold
-    );
-    GnosisTransaction memory txData = GnosisTransaction({to: to, value: 0, data: thresholdData});
-    return txData;
-  }
+   
 
 
     function executeData(
@@ -263,7 +399,7 @@ contract BaseScript is Script {
             refundReceiver,
             nonce
         );
-
+        //vm.prank(owner);
         safe.execTransaction(
             to,
             value,
@@ -303,7 +439,7 @@ contract BaseScript is Script {
             refundReceiver,
             nonce
         );
-
+       // vm.prank(owner);
         safe.execTransaction(
             to,
             value,
@@ -317,5 +453,4 @@ contract BaseScript is Script {
             signature
         );
     }
-
 }
