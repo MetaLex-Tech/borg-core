@@ -39,6 +39,7 @@ contract BaseScript is Script {
   address Ministro = 0x1723cA992E66ef02a541ee09503F21Ef4029271A;
   address Facu = 0xfb4dD6DeE2619ad126b77d68c1659f036363A36d;
   address Stefan = 0x8D09e20b835009E5320cC11E6a6F00aF451aD669;
+  
   address oracle = 0xf00c0dE09574805389743391ada2A0259D6b7a00;
 
   IGnosisSafe safe;

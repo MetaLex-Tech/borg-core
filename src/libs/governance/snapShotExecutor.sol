@@ -29,7 +29,7 @@ contract SnapShotExecutor is BorgAuthACL {
     error SnapShotExecutor_WaitingPeriod();
     error SnapShotExeuctor_InvalidParams();
     error SnapShotExecutor_AlreadyVoted();
-    error SnapShotExeuctor_TooManyPendingProposals();
+    error SnapShotExecutor_TooManyPendingProposals();
 
     //events
     event ProposalCreated(bytes32 indexed proposalId, address indexed target, uint256 value, bytes cdata, string description, uint256 timestamp);
@@ -38,7 +38,6 @@ contract SnapShotExecutor is BorgAuthACL {
     event VotedToCancel(address indexed voter, bytes32 proposalId);
 
     mapping(bytes32 => proposal) public pendingProposals;
-    mapping(bytes32 => address[]) public cancelVotes;
 
     modifier onlyOracle() {
         if (msg.sender != oracle) revert SnapShotExecutor_NotAuthorized();
@@ -57,7 +56,7 @@ contract SnapShotExecutor is BorgAuthACL {
     }
 
     function propose(address target, uint256 value, bytes calldata cdata, string memory description) external onlyOracle() returns (bytes32) {
-        if(pendingProposalCount>pendingProposalLimit) revert SnapShotExeuctor_TooManyPendingProposals();
+        if(pendingProposalCount>pendingProposalLimit) revert SnapShotExecutor_TooManyPendingProposals();
         bytes32 proposalId = keccak256(abi.encodePacked(target, value, cdata, description));
         pendingProposals[proposalId] = proposal(target, value, cdata, description, block.timestamp + waitingPeriod);
         pendingProposalCount++;
