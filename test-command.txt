@@ -1,1 +1,0 @@
-forge test --fork-url <url_here> -vvvv --optimize --optimizer-runs 200 --use solc:0.8.20 --via-ir
