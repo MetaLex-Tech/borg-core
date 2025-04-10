@@ -7,7 +7,7 @@ graph TD
    ychad[ychad.eth<br/>6/9 signers]
    yearnDaoVoting[Yearn DAO Snapshot Voting]
    govExecutor[/TODO governanceExecutor?/]
-   snapshotProposer[/TODO proposer?/]
+   snapshotProposer[/TODO Snapshot proposer?/]
    
    %% TODO TBD
    tempOwner[/TODO owner?/]
@@ -56,3 +56,13 @@ graph TD
    class govExecutor todo;
    class snapshotProposer todo;
 ```
+
+## Member Management Voting Workflow
+
+Example below demonstrates adding `alice` as a new signer to `ychad.eth`, 
+but it also works for broader multisig operations that demand DAO voting.
+
+1. `ychad.eth` approves and calls `voteImplant.proposeTransaction("addMember(alice)")`
+2. Snapshot Proposer sees the proposal on-chain and proposes voting on Snapshot
+3. `governanceExecutor` sees the vote is passed and calls `voteImplant.executeProposal(proposalId)`
+4. `alice` is now added to `ychad.eth`
