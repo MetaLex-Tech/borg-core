@@ -14,25 +14,20 @@ graph TD
     
     ejectImplant{{Eject Implant}}
      
-    signatureCondition[Signature Condition]        
-
     snapshotExecutor[SnapshotExecutor]
 
     ychad -->|"owner / guard by"| borg
-    ychad -->|"sign() / revokeSignature()"| signatureCondition
+    ychad -->|"owner / execute()"| snapshotExecutor
     
     ychadSigner -->|signer| ychad
     ychadSigner -->|"selfEject()"| ejectImplant
 
+    oracleAddr -->|"oracle / propose(member management func)"| snapshotExecutor      
     oracleAddr -->|monitor| yearnDaoVoting
-    oracleAddr -->|"propose(member management func)"| snapshotExecutor      
     
     ejectImplant -->|module| ychad
     
-    signatureCondition -->|"conditions(member management func)"| ejectImplant
-    
-    snapshotExecutor -->|owner| ejectImplant
-    snapshotExecutor -->|"call member management func"| ejectImplant
+    snapshotExecutor -->|"owner / member management func()"| ejectImplant
     
     %% Styling (optional, Mermaid supports limited styling)
     classDef default fill:#191918,stroke:#fff,stroke-width:2px,color:#fff;
@@ -41,7 +36,6 @@ graph TD
     classDef todo fill:#191918,stroke:#F09B4A,stroke-width:2px,color:#F09B4A;
     class borg borg;
     class ejectImplant borg;
-    class signatureCondition borg;
     class snapshotExecutor borg;
     class oracleAddr borg;
     class ychad safe;
@@ -49,12 +43,7 @@ graph TD
 
 ## Member Management Workflow
 
-Example below demonstrates adding `alice` as a new signer to `ychad.eth`.
-
-1. DAO proposes adding `alice` to `ychad.eth` through SnapshotExecutor service
-2. Once passed on Snapshot voting, `oracle` calls `SnapshotExecutor.propose(addOwner(alice))`
-3. `ychad.eth` does one of the following:
-   - To approve it, call `SignatureCondition.sign()` if not yet done
-   - To reject it, call `SignatureCondition.revokeSignature()` if not yet done
-3. Once `ychad.eth` approved and the proposal waiting period is passed, anyone can call `SnapshotExecutor.execute(proposalId)`
-4. `alice` is now added to `ychad.eth`
+1. Action is initiated on the MetaLeX OS webapp
+2. A Snapshot proposal will be submitted via API using Yearn's existing voting settings
+3. MetaLeX's Snapshot oracle will submit the results onchain to an executor contract, which will have the proposed transaction pending for co-approval
+4. ychad.eth will submit co-approval / execute the action through the MetaLeX OS webapp
