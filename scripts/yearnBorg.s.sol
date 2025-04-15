@@ -72,9 +72,11 @@ contract YearnBorgDeployScript is Script {
         address deployerAddress = vm.addr(deployerPrivateKey);
         console2.log("Deployer:", deployerAddress);
 
-        // Initialize Safe tx helper with deployer's private key for now
-        // TODO WIP: This will change since the deployer is not the signer of ychad.eth in real world
-        safeTxHelper = new SafeTxHelper(ychadSafe, multiSendCallOnly, deployerPrivateKey);
+        safeTxHelper = new SafeTxHelper(
+            ychadSafe,
+            multiSendCallOnly,
+            deployerPrivateKey // No-op. We are not supposed to sign any Safe tx here
+        );
 
         vm.startBroadcast(deployerPrivateKey);
 
@@ -98,6 +100,14 @@ contract YearnBorgDeployScript is Script {
             true // _allowEjection
         );
 
+        // Transferring core ownership to the Safe itself
+        coreAuth.updateRole(address(ychadSafe), coreAuth.OWNER_ROLE());
+        coreAuth.zeroOwner();
+
+        // Transferring eject implant ownership to SnapShotExecutor
+        ejectAuth.updateRole(address(snapShotExecutor), ejectAuth.OWNER_ROLE());
+        ejectAuth.zeroOwner();
+
         vm.stopBroadcast();
 
         console2.log("Deployed addresses:");
@@ -107,9 +117,11 @@ contract YearnBorgDeployScript is Script {
         console2.log("  Eject Auth: ", address(ejectAuth));
         console2.log("  SnapShotExecutor: ", address(snapShotExecutor));
 
+        // Prepare Safe TXs for ychad.eth to execute
+
         GnosisTransaction[] memory safeTxs = new GnosisTransaction[](2);
         safeTxs[0] = safeTxHelper.getAddModuleData(address(eject));
-        safeTxs[1] = safeTxHelper.getSetGuardData(address(core));
+        safeTxs[1] = safeTxHelper.getSetGuardData(address(core)); // Note we must set guard last because it may block ychad.eth from adding any more modules
 
         console2.log("Safe TXs:");
         for (uint256 i = 0 ; i < safeTxs.length ; i++) {

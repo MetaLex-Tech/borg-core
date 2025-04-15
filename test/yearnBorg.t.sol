@@ -4,7 +4,6 @@ pragma solidity 0.8.20;
 import "forge-std/Test.sol";
 import {console2} from "forge-std/console2.sol";
 import {YearnBorgDeployScript} from "../scripts/yearnBorg.s.sol";
-import {YearnBorgPostDeployScript} from "../scripts/yearnBorgPost.s.sol";
 import {YearnBorgAcceptanceTest} from "./yearnBorgAcceptance.t.sol";
 import {GnosisTransaction} from "../test/libraries/safe.t.sol";
 
@@ -22,9 +21,6 @@ contract YearnBorgTest is YearnBorgAcceptanceTest {
 
         // Simulate ychad.eth executing the provided Safe TXs (set guard & add module)
         safeTxHelper.executeBatch(safeTxs);
-
-        // MetaLex to finish the deployment
-        (new YearnBorgPostDeployScript()).run(testSignerPrivateKey, core, eject, snapShotExecutor);
     }
 
     // The acceptance tests will run against the overridden setup
