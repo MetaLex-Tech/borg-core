@@ -95,8 +95,6 @@ contract YearnBorgAcceptanceTest is Test {
             safeTxHelper.executeSingle(safeTxHelper.getTransferData(address(weth), alice, 1 ether));
             vm.assertEq(weth.balanceOf(alice) - balanceBefore, 1 ether);
         }
-
-        // TODO How to do it when Safe is not 1/1?
     }
 
     /// @dev Safe signers should be able to self-resign
