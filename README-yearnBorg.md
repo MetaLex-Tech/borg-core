@@ -48,6 +48,18 @@ graph TD
 3. MetaLeX's Snapshot oracle will submit the results onchain to an executor contract, which will have the proposed transaction pending for co-approval
 4. ychad.eth will submit co-approval / execute the action through the MetaLeX OS webapp
 
+## Deployment
+
+1. Run the deploy script
+   ```bash
+   forge script scripts/yearnBorg.s.sol --rpc-url <RPC URL> --optimize --optimizer-runs 200 --use solc:0.8.20 --via-ir --broadcast
+   ```
+
+2. If got the following errors, force clean the cache with flag `--force`
+   ```
+   Error: buffer overrun while deserializing
+   ```
+
 ## Tests
 
 ### Integration Tests

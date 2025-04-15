@@ -26,9 +26,10 @@ contract MockFailSafeImplant {
     }
 }
 
-contract YearnBorgDeployScript is Script, SafeTxHelper {
+contract YearnBorgDeployScript is Script {
     // Configs: BORG Core
 
+    IGnosisSafe ychadSafe = IGnosisSafe(0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52); // ychad.eth
     string borgIdentifier = "Yearn BORG"; // TODO WIP Ask for confirmation
     borgCore.borgModes borgMode = borgCore.borgModes.unrestricted;
     uint256 borgType = 0x3; // TODO WIP Ask for confirmation
@@ -39,6 +40,8 @@ contract YearnBorgDeployScript is Script, SafeTxHelper {
     uint256 snapShotThreshold = 2;
     uint256 snapShotPendingProposalLimit = 3;
     address oracle = 0xf00c0dE09574805389743391ada2A0259D6b7a00;
+    
+    SafeTxHelper safeTxHelper;
 
     borgCore core;
     BorgAuth coreAuth;
@@ -46,48 +49,41 @@ contract YearnBorgDeployScript is Script, SafeTxHelper {
     ejectImplant eject;
     SnapShotExecutor snapShotExecutor;
 
-    constructor() SafeTxHelper(
-        // TODO test
-//        0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52, // ychad.eth
-        0xa2536225f0c0979D119E1877100f514179339700, // test
-
-        // TODO deprecated: This is no longer useful for non 1/1 multisig
-        vm.envUint("PRIVATE_KEY_BORG_MEMBER_A")     // Signer
-    ) {}
-
+    /// @dev For running from `forge script`. Provide the deployer private key through env var.
     function run() public returns(borgCore, ejectImplant, SnapShotExecutor) {
+        return run(vm.envUint("DEPLOYER_PRIVATE_KEY"));
+    }
+
+    /// @dev For running in tests
+    function run(uint256 deployerPrivateKey) public returns(borgCore, ejectImplant, SnapShotExecutor) {
         console2.log("block number:", block.number);
 
         console2.log("Configs:");
         console2.log("  BORG name:", borgIdentifier);
         console2.log("  BORG mode:", uint8(borgMode));
         console2.log("  BORG type:", borgType);
-        console2.log("  Safe Multisig:", address(safe));
+        console2.log("  Safe Multisig:", address(ychadSafe));
         console2.log("  Snapshot waiting period (secs.):", snapShotWaitingPeriod);
         console2.log("  Snapshot threshold:", snapShotThreshold);
         console2.log("  Snapshot pending proposal limit:", snapShotPendingProposalLimit);
 
-        // TODO test
-//        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY_DEPLOYER");
-//        address deployerAddress = vm.addr(deployerPrivateKey);
-//
-//        console2.log("deployer:", deployerAddress);
-//
-//        vm.startBroadcast(deployerPrivateKey);
-
-        address deployerAddress = vm.addr(signerPrivateKey);
+        address deployerAddress = vm.addr(deployerPrivateKey);
         console2.log("Deployer:", deployerAddress);
 
-        vm.startBroadcast(signerPrivateKey);
+        // Initialize Safe tx helper with deployer's private key for now
+        // TODO WIP: This will change since the deployer is not the signer of ychad.eth in real world
+        safeTxHelper = new SafeTxHelper(ychadSafe, deployerPrivateKey);
+
+        vm.startBroadcast(deployerPrivateKey);
 
         // Core
 
         coreAuth = new BorgAuth();
-        core = new borgCore(coreAuth, borgType, borgMode, borgIdentifier, address(safe));
+        core = new borgCore(coreAuth, borgType, borgMode, borgIdentifier, address(ychadSafe));
 
         // SnapShotExecutor
 
-        snapShotExecutor = new SnapShotExecutor(coreAuth, address(safe), address(oracle), snapShotWaitingPeriod, snapShotThreshold, snapShotPendingProposalLimit);
+        snapShotExecutor = new SnapShotExecutor(coreAuth, address(ychadSafe), address(oracle), snapShotWaitingPeriod, snapShotThreshold, snapShotPendingProposalLimit);
 
         // Add modules
 
@@ -95,22 +91,22 @@ contract YearnBorgDeployScript is Script, SafeTxHelper {
         // TODO WIP Use mock failSafe
         eject = new ejectImplant(
             ejectAuth,
-            address(safe),
+            address(ychadSafe),
             address(new MockFailSafeImplant()), // _failSafe
             true, // _allowManagement
             true // _allowEjection
         );
 
         // TODO Staged due to external signers
-        executeSingle(getAddModuleData(address(eject)));
+        safeTxHelper.executeSingle(safeTxHelper.getAddModuleData(address(eject)));
 
         // TODO Staged due to external signers
         // Set the core as the guard for the Safe
-        executeSingle(getSetGuardData(address(core)));
+        safeTxHelper.executeSingle(safeTxHelper.getSetGuardData(address(core)));
 
         // We have done everything that requires owner role
         // Transferring core ownership to the Safe itself
-        coreAuth.updateRole(address(safe), coreAuth.OWNER_ROLE());
+        coreAuth.updateRole(address(ychadSafe), coreAuth.OWNER_ROLE());
         coreAuth.zeroOwner();
         // Transferring eject implant ownership to SnapShotExecutor
         ejectAuth.updateRole(address(snapShotExecutor), ejectAuth.OWNER_ROLE());

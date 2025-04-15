@@ -6,13 +6,16 @@ import {CommonBase} from "forge-std/Base.sol";
 import {BaseAllocation} from "metavest/BaseAllocation.sol";
 import "./safe.t.sol";
 
+// TODO Similar codes are used in other test files as well, consider refactoring and merging them here
 contract SafeTxHelper is CommonBase {
     IGnosisSafe safe;
     uint256 signerPrivateKey;
+    address signer;
 
-    constructor(address _safe, uint256 _signerPrivateKey) {
-        safe = IGnosisSafe(_safe);
+    constructor(IGnosisSafe _safe, uint256 _signerPrivateKey) {
+        safe = _safe;
         signerPrivateKey = _signerPrivateKey;
+        signer = vm.addr(signerPrivateKey);
     }
 
     function createTestBatch(address core) public returns (GnosisTransaction[] memory) {
