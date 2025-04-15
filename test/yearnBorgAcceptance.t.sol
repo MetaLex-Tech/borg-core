@@ -17,6 +17,10 @@ contract YearnBorgAcceptanceTest is Test, SafeTxHelper {
     address safeSigner1 = 0x48E2a0d849c8F3c815ec1B0c0A9bC076d840c107; // TODO Replace it with ychad.eth signer
     uint256 safeThreshold = 1; // TODO Replace it with ychad.eth threshold
 
+    address oracle = 0xf00c0dE09574805389743391ada2A0259D6b7a00;
+
+    address alice = vm.addr(1);
+
     borgCore core;
     ejectImplant eject;
     SnapShotExecutor snapShotExecutor;
@@ -67,6 +71,13 @@ contract YearnBorgAcceptanceTest is Test, SafeTxHelper {
         }
     }
 
+    function testSnapShotExecutorMeta() public {
+        assertEq(snapShotExecutor.oracle(), oracle, "Unexpected oracle");
+        assertEq(snapShotExecutor.waitingPeriod(), 3 days, "Unexpected waitingPeriod");
+        assertEq(snapShotExecutor.threshold(), 2, "Unexpected threshold");
+        assertEq(snapShotExecutor.pendingProposalLimit(), 3, "Unexpected pendingProposalLimit");
+    }
+
     /// @dev Safe normal operations should be unrestricted
     function testSafeOpUnrestricted() public {
         {
@@ -99,5 +110,71 @@ contract YearnBorgAcceptanceTest is Test, SafeTxHelper {
         vm.assertEq(safe.getThreshold(), safeThreshold, "Threshold should not change");
 
         // TODO Test with reduce = true
+    }
+
+    /// @dev Normal Member Management workflow should succeed
+    function testMemberManagement() public {
+        vm.assertFalse(safe.isOwner(alice), "Should not be Safe signer");
+
+        vm.prank(oracle);
+        bytes32 proposalId = snapShotExecutor.propose(
+            address(eject), // target
+            0, // value
+            abi.encodeWithSelector(
+                bytes4(keccak256("addOwner(address)")),
+                alice // newOwner
+            ), // cdata
+            "Add Alice as new signer"
+        );
+
+        bytes memory executeCalldata = abi.encodeWithSelector(
+            snapShotExecutor.execute.selector,
+            proposalId
+        );
+
+        // Should fail within waiting period
+        executeSingle(
+            GnosisTransaction({
+                to: address(snapShotExecutor),
+                value: 0,
+                data: executeCalldata
+            }),
+            "GS013" // expectRevertData
+        );
+
+        // After waiting period
+        skip(snapShotExecutor.waitingPeriod());
+
+        // Should fail if not executed from Safe
+        vm.expectRevert(abi.encodeWithSelector(BorgAuth.BorgAuth_NotAuthorized.selector, core.AUTH().OWNER_ROLE(), address(this)));
+        snapShotExecutor.execute(proposalId);
+
+        // Should succeed if executed from Safe
+        executeSingle(GnosisTransaction({
+            to: address(snapShotExecutor),
+            value: 0,
+            data: executeCalldata
+        }));
+
+        vm.assertTrue(safe.isOwner(alice), "Should be Safe signer");
+    }
+
+    /// @dev Non-oracle should not be able to propose
+    function test_RevertIf_NotOracle() public {
+        vm.expectRevert(abi.encodeWithSelector(SnapShotExecutor.SnapShotExecutor_NotAuthorized.selector));
+        snapShotExecutor.propose(
+            address(eject), // target
+            0, // value
+            "", // cdata
+            "Arbitrary instruction"
+        );
+    }
+
+    /// @dev Safe should not be able to add/remove signer itself
+    function test_RevertIf_DirectMemberManagement() public {
+        executeSingle(
+            getAddOwnerData(alice), // tx
+            abi.encodeWithSelector(borgCore.BORG_CORE_MethodNotAuthorized.selector) // expectRevertData
+        );
     }
 }

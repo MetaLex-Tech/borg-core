@@ -21,16 +21,16 @@ contract SafeTxHelper is CommonBase {
         address token = 0xF17A3fE536F8F7847F1385ec1bC967b2Ca9caE8D;
 
         // set guard
-        bytes4 setGuardFunctionSignature = bytes4(
+        bytes4 funcSig = bytes4(
             keccak256("setGuard(address)")
         );
 
-        bytes memory guardData = abi.encodeWithSelector(
-            setGuardFunctionSignature,
+        bytes memory cdata = abi.encodeWithSelector(
+            funcSig,
             core
         );
 
-        batch[0] = GnosisTransaction({to: address(safe), value: 0, data: guardData});
+        batch[0] = GnosisTransaction({to: address(safe), value: 0, data: cdata});
 
         bytes4 approveFunctionSignature = bytes4(
             keccak256("approve(address,uint256)")
@@ -48,28 +48,28 @@ contract SafeTxHelper is CommonBase {
     }
 
     function getAddModuleData(address to) public view returns (GnosisTransaction memory) {
-        bytes4 addContractMethod = bytes4(
+        bytes4 funcSig = bytes4(
             keccak256("enableModule(address)")
         );
 
-        bytes memory guardData = abi.encodeWithSelector(
-            addContractMethod,
+        bytes memory cdata = abi.encodeWithSelector(
+            funcSig,
             to
         );
-        GnosisTransaction memory txData = GnosisTransaction({to: address(safe), value: 0, data: guardData});
+        GnosisTransaction memory txData = GnosisTransaction({to: address(safe), value: 0, data: cdata});
         return txData;
     }
 
     function getSetGuardData(address core) public view returns (GnosisTransaction memory) {
-        bytes4 setGuardFunctionSignature = bytes4(
+        bytes4 funcSig = bytes4(
             keccak256("setGuard(address)")
         );
 
-        bytes memory guardData = abi.encodeWithSelector(
-            setGuardFunctionSignature,
+        bytes memory cdata = abi.encodeWithSelector(
+            funcSig,
             core
         );
-        GnosisTransaction memory txData = GnosisTransaction({to: address(safe), value: 0, data: guardData});
+        GnosisTransaction memory txData = GnosisTransaction({to: address(safe), value: 0, data: cdata});
         return txData;
     }
 
@@ -108,43 +108,43 @@ contract SafeTxHelper is CommonBase {
     }
 
     function getAddContractGuardData(address to, address allow, uint256 amount) public view returns (GnosisTransaction memory) {
-        bytes4 addContractMethod = bytes4(
+        bytes4 funcSig = bytes4(
             keccak256("addContract(address,uint256)")
         );
 
-        bytes memory guardData = abi.encodeWithSelector(
-            addContractMethod,
+        bytes memory cdata = abi.encodeWithSelector(
+            funcSig,
             address(allow),
             amount
         );
-        GnosisTransaction memory txData = GnosisTransaction({to: to, value: 0, data: guardData});
+        GnosisTransaction memory txData = GnosisTransaction({to: to, value: 0, data: cdata});
         return txData;
     }
 
     function getAddEjectModuleData(address to) public view returns (GnosisTransaction memory) {
-        bytes4 addContractMethod = bytes4(
+        bytes4 funcSig = bytes4(
             keccak256("enableModule(address)")
         );
 
-        bytes memory guardData = abi.encodeWithSelector(
-            addContractMethod,
+        bytes memory cdata = abi.encodeWithSelector(
+            funcSig,
             to
         );
-        GnosisTransaction memory txData = GnosisTransaction({to: address(safe), value: 0, data: guardData});
+        GnosisTransaction memory txData = GnosisTransaction({to: address(safe), value: 0, data: cdata});
         return txData;
     }
 
     function getAddOwnerData(address toAdd) public view returns (GnosisTransaction memory) {
-        bytes4 addContractMethod = bytes4(
+        bytes4 funcSig = bytes4(
             keccak256("addOwnerWithThreshold(address,uint256)")
         );
 
-        bytes memory guardData = abi.encodeWithSelector(
-            addContractMethod,
+        bytes memory cdata = abi.encodeWithSelector(
+            funcSig,
             toAdd,
             1
         );
-        GnosisTransaction memory txData = GnosisTransaction({to: address(safe), value: 0, data: guardData});
+        GnosisTransaction memory txData = GnosisTransaction({to: address(safe), value: 0, data: cdata});
         return txData;
     }
 
@@ -189,17 +189,17 @@ contract SafeTxHelper is CommonBase {
     }
 
     function getCreateGrantData(address opGrant, address token, address rec, uint256 amount) public view returns (GnosisTransaction memory) {
-        bytes4 addContractMethod = bytes4(
+        bytes4 funcSig = bytes4(
             keccak256("createDirectGrant(address,address,uint256)")
         );
 
-        bytes memory guardData = abi.encodeWithSelector(
-            addContractMethod,
+        bytes memory cdata = abi.encodeWithSelector(
+            funcSig,
             token,
             rec,
             amount
         );
-        GnosisTransaction memory txData = GnosisTransaction({to: opGrant, value: 0, data: guardData});
+        GnosisTransaction memory txData = GnosisTransaction({to: opGrant, value: 0, data: cdata});
         return txData;
     }
 
@@ -218,11 +218,11 @@ contract SafeTxHelper is CommonBase {
             unlockStartTime: uint48(block.timestamp),
             tokenContract: token
         });
-        bytes4 addContractMethod = bytes4(
+        bytes4 funcSig = bytes4(
             keccak256("createAdvancedGrant(uint8,address,(uint256,uint128,uint128,uint160,uint48,uint48,uint160,uint48,uint48,address),(uint256,bool,bool,address[])[],uint256,address,uint256,uint256)")
         );
-        bytes memory guardData = abi.encodeWithSelector(
-            addContractMethod,
+        bytes memory cdata = abi.encodeWithSelector(
+            funcSig,
             0,
             rec,
             _metavestDetails,
@@ -232,7 +232,7 @@ contract SafeTxHelper is CommonBase {
             0,
             0
         );
-        GnosisTransaction memory txData = GnosisTransaction({to: opGrant, value: 0, data: guardData});
+        GnosisTransaction memory txData = GnosisTransaction({to: opGrant, value: 0, data: cdata});
         return txData;
     }
 

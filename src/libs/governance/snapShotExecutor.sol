@@ -45,14 +45,14 @@ contract SnapShotExecutor is BorgAuthACL {
         _;
     }
 
-    constructor(BorgAuth _auth, address _borgSafe, address _oracle, uint256 _waitingPeriod, uint256 threshold, uint256 _pendingProposals) BorgAuthACL(_auth) {
+    constructor(BorgAuth _auth, address _borgSafe, address _oracle, uint256 _waitingPeriod, uint256 _threshold, uint256 _pendingProposals) BorgAuthACL(_auth) {
         if(_borgSafe == address(0) || _oracle == address(0)) revert SnapShotExecutor_ZeroAddress();
         borgSafe = _borgSafe;
         oracle = _oracle;
         if(_waitingPeriod < 1 minutes) revert SnapShotExeuctor_InvalidParams();
         waitingPeriod = _waitingPeriod;
-        if(threshold < 2) revert SnapShotExeuctor_InvalidParams();
-        threshold = threshold;
+        if(_threshold < 2) revert SnapShotExeuctor_InvalidParams();
+        threshold = _threshold;
         pendingProposalLimit = _pendingProposals;
     }
 
