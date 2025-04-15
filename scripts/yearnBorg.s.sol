@@ -14,7 +14,7 @@ import {SignatureCondition} from "../src/libs/conditions/signatureCondition.sol"
 import {BorgAuth} from "../src/libs/auth.sol";
 import {SnapShotExecutor} from "../src/libs/governance/snapShotExecutor.sol";
 import {SafeTxHelper} from "../test/libraries/safeTxHelper.sol";
-import {IGnosisSafe, GnosisTransaction} from "../test/libraries/safe.t.sol";
+import {IGnosisSafe, GnosisTransaction, IMultiSendCallOnly} from "../test/libraries/safe.t.sol";
 
 contract MockFailSafeImplant {
     uint256 public immutable IMPLANT_ID = 0;
@@ -27,6 +27,10 @@ contract MockFailSafeImplant {
 }
 
 contract YearnBorgDeployScript is Script {
+    // Safe 1.3.0 Multi Send Call Only @ Ethereum mainnet
+    // https://github.com/safe-global/safe-deployments?tab=readme-ov-file
+    IMultiSendCallOnly multiSendCallOnly = IMultiSendCallOnly(0x40A2aCCbd92BCA938b02010E17A5b8929b49130D);
+
     // Configs: BORG Core
 
     IGnosisSafe ychadSafe = IGnosisSafe(0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52); // ychad.eth
@@ -50,15 +54,13 @@ contract YearnBorgDeployScript is Script {
     SnapShotExecutor snapShotExecutor;
 
     /// @dev For running from `forge script`. Provide the deployer private key through env var.
-    function run() public returns(borgCore, ejectImplant, SnapShotExecutor) {
+    function run() public returns(borgCore, ejectImplant, SnapShotExecutor, GnosisTransaction[] memory) {
         return run(vm.envUint("DEPLOYER_PRIVATE_KEY"));
     }
 
     /// @dev For running in tests
-    function run(uint256 deployerPrivateKey) public returns(borgCore, ejectImplant, SnapShotExecutor) {
-        console2.log("block number:", block.number);
-
-        console2.log("Configs:");
+    function run(uint256 deployerPrivateKey) public returns(borgCore, ejectImplant, SnapShotExecutor, GnosisTransaction[] memory) {
+        console2.log("Deploy Configs:");
         console2.log("  BORG name:", borgIdentifier);
         console2.log("  BORG mode:", uint8(borgMode));
         console2.log("  BORG type:", borgType);
@@ -72,7 +74,7 @@ contract YearnBorgDeployScript is Script {
 
         // Initialize Safe tx helper with deployer's private key for now
         // TODO WIP: This will change since the deployer is not the signer of ychad.eth in real world
-        safeTxHelper = new SafeTxHelper(ychadSafe, deployerPrivateKey);
+        safeTxHelper = new SafeTxHelper(ychadSafe, multiSendCallOnly, deployerPrivateKey);
 
         vm.startBroadcast(deployerPrivateKey);
 
@@ -88,7 +90,6 @@ contract YearnBorgDeployScript is Script {
         // Add modules
 
         ejectAuth = new BorgAuth();
-        // TODO WIP Use mock failSafe
         eject = new ejectImplant(
             ejectAuth,
             address(ychadSafe),
@@ -96,21 +97,6 @@ contract YearnBorgDeployScript is Script {
             true, // _allowManagement
             true // _allowEjection
         );
-
-        // TODO Staged due to external signers
-        safeTxHelper.executeSingle(safeTxHelper.getAddModuleData(address(eject)));
-
-        // TODO Staged due to external signers
-        // Set the core as the guard for the Safe
-        safeTxHelper.executeSingle(safeTxHelper.getSetGuardData(address(core)));
-
-        // We have done everything that requires owner role
-        // Transferring core ownership to the Safe itself
-        coreAuth.updateRole(address(ychadSafe), coreAuth.OWNER_ROLE());
-        coreAuth.zeroOwner();
-        // Transferring eject implant ownership to SnapShotExecutor
-        ejectAuth.updateRole(address(snapShotExecutor), ejectAuth.OWNER_ROLE());
-        ejectAuth.zeroOwner();
 
         vm.stopBroadcast();
 
@@ -121,6 +107,20 @@ contract YearnBorgDeployScript is Script {
         console2.log("  Eject Auth: ", address(ejectAuth));
         console2.log("  SnapShotExecutor: ", address(snapShotExecutor));
 
-        return (core, eject, snapShotExecutor);
+        GnosisTransaction[] memory safeTxs = new GnosisTransaction[](2);
+        safeTxs[0] = safeTxHelper.getAddModuleData(address(eject));
+        safeTxs[1] = safeTxHelper.getSetGuardData(address(core));
+
+        console2.log("Safe TXs:");
+        for (uint256 i = 0 ; i < safeTxs.length ; i++) {
+            console2.log("  #", i);
+            console2.log("    to:", safeTxs[i].to);
+            console2.log("    value:", safeTxs[i].value);
+            console2.log("    data:");
+            console2.logBytes(safeTxs[i].data);
+            console2.log("");
+        }
+
+        return (core, eject, snapShotExecutor, safeTxs);
     }
 }

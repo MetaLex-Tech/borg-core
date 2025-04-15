@@ -4,18 +4,27 @@ pragma solidity 0.8.20;
 import "forge-std/Test.sol";
 import {console2} from "forge-std/console2.sol";
 import {YearnBorgDeployScript} from "../scripts/yearnBorg.s.sol";
+import {YearnBorgPostDeployScript} from "../scripts/yearnBorgPost.s.sol";
 import {YearnBorgAcceptanceTest} from "./yearnBorgAcceptance.t.sol";
+import {GnosisTransaction} from "../test/libraries/safe.t.sol";
 
 contract YearnBorgTest is YearnBorgAcceptanceTest {
     function setUp() public override {
         // Assume Ethereum mainnet fork after block 22268905
 
-        // Change ychad.eth threshold and add test owner so we can run tests
+        // Simulate changing ychad.eth threshold and adding the test owner so we can run tests
         vm.prank(address(ychadSafe));
         ychadSafe.addOwnerWithThreshold(testSigner, 1);
 
-        // Run deploy script and override with the newly deployed contract addresses
-        (core, eject, snapShotExecutor) = (new YearnBorgDeployScript()).run(testSignerPrivateKey);
+        // MetaLex to deploy new BORG contracts and generate corresponding Safe txs for ychad.eth
+        GnosisTransaction[] memory safeTxs;
+        (core, eject, snapShotExecutor, safeTxs) = (new YearnBorgDeployScript()).run(testSignerPrivateKey);
+
+        // Simulate ychad.eth executing the provided Safe TXs (set guard & add module)
+        safeTxHelper.executeBatch(safeTxs);
+
+        // MetaLex to finish the deployment
+        (new YearnBorgPostDeployScript()).run(testSignerPrivateKey, core, eject, snapShotExecutor);
     }
 
     // The acceptance tests will run against the overridden setup

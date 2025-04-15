@@ -9,11 +9,13 @@ import "./safe.t.sol";
 // TODO Similar codes are used in other test files as well, consider refactoring and merging them here
 contract SafeTxHelper is CommonBase {
     IGnosisSafe safe;
+    IMultiSendCallOnly multiSendCallOnly;
     uint256 signerPrivateKey;
     address signer;
 
-    constructor(IGnosisSafe _safe, uint256 _signerPrivateKey) {
+    constructor(IGnosisSafe _safe, IMultiSendCallOnly _multiSendCallOnly, uint256 _signerPrivateKey) {
         safe = _safe;
+        multiSendCallOnly = _multiSendCallOnly;
         signerPrivateKey = _signerPrivateKey;
         signer = vm.addr(signerPrivateKey);
     }
@@ -267,6 +269,34 @@ contract SafeTxHelper is CommonBase {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPrivateKey, keccak256(txHashData));
         bytes memory signature = abi.encodePacked(r, s, v);
         return signature;
+    }
+
+    function getBatchExecutionData(
+        GnosisTransaction[] memory batch
+    ) public view returns (bytes memory) {
+        bytes memory transactions = new bytes(0);
+        for (uint256 i = 0; i < batch.length; i++) {
+            transactions = abi.encodePacked(
+                transactions,
+                uint8(0),
+                batch[i].to,
+                batch[i].value,
+                batch[i].data.length,
+                batch[i].data
+            );
+        }
+
+        bytes memory data = abi.encodeWithSelector(
+            multiSendCallOnly.multiSend.selector,
+            transactions
+        );
+        return data;
+    }
+
+    function executeBatch(GnosisTransaction[] memory batch) public {
+        bytes memory data = getBatchExecutionData(batch);
+        // Note it does not handle native ETH values as there is no such need so far
+        executeData(address(multiSendCallOnly), 1, data, 0, "");
     }
 
     function executeSingle(GnosisTransaction memory tx) public {

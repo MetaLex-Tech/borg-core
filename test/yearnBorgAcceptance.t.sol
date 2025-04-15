@@ -8,10 +8,14 @@ import {ejectImplant} from "../src/implants/ejectImplant.sol";
 import {BorgAuth} from "../src/libs/auth.sol";
 import {SnapShotExecutor} from "../src/libs/governance/snapShotExecutor.sol";
 import {SafeTxHelper} from "./libraries/safeTxHelper.sol";
-import "./libraries/safe.t.sol";
+import {IGnosisSafe, GnosisTransaction, IMultiSendCallOnly} from "../test/libraries/safe.t.sol";
 
 contract YearnBorgAcceptanceTest is Test {
-    ERC20 weth = ERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
+    ERC20 weth = ERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2); // Ethereum mainnet
+
+    // Safe 1.3.0 Multi Send Call Only @ Ethereum mainnet
+    // https://github.com/safe-global/safe-deployments?tab=readme-ov-file
+    IMultiSendCallOnly multiSendCallOnly = IMultiSendCallOnly(0x40A2aCCbd92BCA938b02010E17A5b8929b49130D);
 
     IGnosisSafe ychadSafe = IGnosisSafe(0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52); // ychad.eth
 
@@ -22,7 +26,7 @@ contract YearnBorgAcceptanceTest is Test {
     
     address alice = vm.addr(2);
 
-    SafeTxHelper safeTxHelper = new SafeTxHelper(ychadSafe, testSignerPrivateKey);
+    SafeTxHelper safeTxHelper = new SafeTxHelper(ychadSafe, multiSendCallOnly, testSignerPrivateKey);
     
     borgCore core;
     ejectImplant eject;
