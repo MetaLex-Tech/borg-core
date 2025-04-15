@@ -11,6 +11,8 @@ interface IGnosisSafe {
 
     function setGuard(address guard) external;
 
+    function addOwnerWithThreshold(address owner, uint256 threshold) external;
+
     function execTransaction(
         address to,
         uint256 value,

@@ -47,3 +47,21 @@ graph TD
 2. A Snapshot proposal will be submitted via API using Yearn's existing voting settings
 3. MetaLeX's Snapshot oracle will submit the results onchain to an executor contract, which will have the proposed transaction pending for co-approval
 4. ychad.eth will submit co-approval / execute the action through the MetaLeX OS webapp
+
+## Tests
+
+### Integration Tests
+
+Test the deployment scripts and verify the results.
+
+```bash
+forge test --optimize --optimizer-runs 200 --use solc:0.8.20 --via-ir --fork-url <eth-mainnet-archive-endpoint> --fork-block-number 22268905 --mc YearnBorgTest   
+```
+
+### Acceptance Tests
+
+Verify the specified deployment results.
+
+```bash
+forge test --optimize --optimizer-runs 200 --use solc:0.8.20 --via-ir --fork-url <eth-mainnet-archive-endpoint> --fork-block-number <deployment-block-number> --mc YearnBorgAcceptanceTest   
+```
