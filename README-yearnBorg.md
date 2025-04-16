@@ -62,8 +62,27 @@ all coming operations as listed above will require approval of both `ychad.eth` 
 
 1. Operation is initiated on the MetaLeX OS webapp
 2. A Snapshot proposal will be submitted via API using Yearn's existing voting settings
-3. MetaLeX's Snapshot oracle will submit the results onchain to an executor contract (`SnapShotExecutor`), which will have the proposed transaction pending for co-approval
-4. `ychad.eth` will approve by executing the operation through the MetaLeX OS webapp
+3. MetaLeX's Snapshot oracle (`oracle`) will submit the results onchain to an executor contract (`SnapShotExecutor`), which will have the proposed transaction pending for co-approval
+4. `ychad.eth` will co-approve it by executing the operation through the MetaLeX OS webapp
+
+### Future On-chain Governance Transition
+
+The veYFI Snapshot governance will be replaced with on-chain governance at some point, at which we will implement a bridge contract `YearnGovExecutor`
+that looks up voting results on Yearn's on-chain governance contract and performs the following:
+- Verify the vote is passed
+- Extract and execute its instructions (specifically `target`, `value`, `calldata`)
+
+The transition process is as follows:
+
+1. Deploy `YearnGovExecutor` and set `ychad.eth` as its owner 
+2. A Snapshot proposal will be submitted to replace `SnapShotExecutor` with `YearnGovExecutor`. 
+   More specifically, it is done by transferring `SudoImplant`'s and `EjectImplant`'s owner to `YearnGovExecutor`
+
+After the transition, the co-approval process will become:
+
+1. Operation is initiated on the MetaLeX OS webapp
+2. An on-chain proposal will be submitted to Yearn governance contract
+3. Once the vote passed, `ychad.eth` will co-approve it by executing the operation through MetaLex OS webapp 
 
 ## Key Parameters
 

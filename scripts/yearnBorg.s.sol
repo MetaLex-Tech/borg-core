@@ -40,7 +40,7 @@ contract YearnBorgDeployScript is Script {
 
     // Configs: SnapShowExecutor
 
-    uint256 snapShotWaitingPeriod = 3 days;
+    uint256 snapShotWaitingPeriod = 3 days; // TODO Is it still necessary?
     uint256 snapShotCancelPeriod = 2 days;
     uint256 snapShotPendingProposalLimit = 3;
     address oracle = 0xf00c0dE09574805389743391ada2A0259D6b7a00;
