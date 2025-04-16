@@ -46,7 +46,7 @@ contract YearnBorgAcceptanceTest is Test {
     function testBorgMeta() public {
         assertEq(core.id(), "Yearn BORG", "Unexpected BORG ID");
         assertEq(core.borgType(), 0x3, "Unexpected BORG Core type");
-        assertEq(uint8(core.borgMode()), uint8(borgCore.borgModes.unrestricted), "Unexpected BORG Core mode");
+        assertEq(uint8(core.borgMode()), uint8(borgCore.borgModes.blacklist), "Unexpected BORG Core mode");
     }
 
     /// @dev BorgAuth instances should be proper assigned and configured
@@ -76,7 +76,7 @@ contract YearnBorgAcceptanceTest is Test {
     function testSnapShotExecutorMeta() public {
         assertEq(snapShotExecutor.oracle(), oracle, "Unexpected oracle");
         assertEq(snapShotExecutor.waitingPeriod(), 3 days, "Unexpected waitingPeriod");
-        assertEq(snapShotExecutor.threshold(), 2, "Unexpected threshold");
+        assertEq(snapShotExecutor.cancelPeriod(), 2 days, "Unexpected cancelPeriod");
         assertEq(snapShotExecutor.pendingProposalLimit(), 3, "Unexpected pendingProposalLimit");
     }
 

@@ -35,13 +35,13 @@ contract YearnBorgDeployScript is Script {
 
     IGnosisSafe ychadSafe = IGnosisSafe(0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52); // ychad.eth
     string borgIdentifier = "Yearn BORG"; // TODO WIP Ask for confirmation
-    borgCore.borgModes borgMode = borgCore.borgModes.unrestricted;
+    borgCore.borgModes borgMode = borgCore.borgModes.blacklist;
     uint256 borgType = 0x3; // TODO WIP Ask for confirmation
 
     // Configs: SnapShowExecutor
 
     uint256 snapShotWaitingPeriod = 3 days;
-    uint256 snapShotThreshold = 2;
+    uint256 snapShotCancelPeriod = 2 days;
     uint256 snapShotPendingProposalLimit = 3;
     address oracle = 0xf00c0dE09574805389743391ada2A0259D6b7a00;
     
@@ -66,7 +66,7 @@ contract YearnBorgDeployScript is Script {
         console2.log("  BORG type:", borgType);
         console2.log("  Safe Multisig:", address(ychadSafe));
         console2.log("  Snapshot waiting period (secs.):", snapShotWaitingPeriod);
-        console2.log("  Snapshot threshold:", snapShotThreshold);
+        console2.log("  Snapshot cancel period (secs.):", snapShotCancelPeriod);
         console2.log("  Snapshot pending proposal limit:", snapShotPendingProposalLimit);
 
         address deployerAddress = vm.addr(deployerPrivateKey);
@@ -87,7 +87,7 @@ contract YearnBorgDeployScript is Script {
 
         // SnapShotExecutor
 
-        snapShotExecutor = new SnapShotExecutor(coreAuth, address(ychadSafe), address(oracle), snapShotWaitingPeriod, snapShotThreshold, snapShotPendingProposalLimit);
+        snapShotExecutor = new SnapShotExecutor(coreAuth, address(oracle), snapShotWaitingPeriod, snapShotCancelPeriod, snapShotPendingProposalLimit);
 
         // Add modules
 

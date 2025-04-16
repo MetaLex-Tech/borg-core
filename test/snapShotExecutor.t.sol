@@ -1,0 +1,206 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+pragma solidity 0.8.20;
+
+import "forge-std/Test.sol";
+import "solady/tokens/ERC20.sol";
+import {borgCore} from "../src/borgCore.sol";
+import {ejectImplant} from "../src/implants/ejectImplant.sol";
+import {BorgAuth} from "../src/libs/auth.sol";
+import {SnapShotExecutor} from "../src/libs/governance/snapShotExecutor.sol";
+import {IGnosisSafe, GnosisTransaction, IMultiSendCallOnly} from "../test/libraries/safe.t.sol";
+
+contract SnapShotExecutorTest is Test {
+
+    address owner = vm.addr(1);
+    address oracle = vm.addr(2);
+    address alice = vm.addr(3);
+
+    BorgAuth auth;
+    SnapShotExecutor snapShotExecutor;
+
+    event ProposalCreated(bytes32 indexed proposalId, address indexed target, uint256 value, bytes cdata, string description, uint256 timestamp);
+    event ProposalExecuted(bytes32 indexed proposalId, address indexed target, uint256 value, bytes cdata, string description, uint256 timestamp, bool success);
+    event ProposalCanceled(bytes32 indexed proposalId, address indexed target, uint256 value, bytes cdata, string description, uint256 timestamp);
+
+    function setUp() public virtual {
+        auth = new BorgAuth();
+        snapShotExecutor = new SnapShotExecutor(
+            auth,
+            oracle,
+            3 days, // waitingPeriod
+            2 days, // cancelPeriod
+            3 // pendingProposalLimit
+        );
+
+        // Transferring auth ownership
+        auth.updateRole(owner, auth.OWNER_ROLE());
+        auth.zeroOwner();
+    }
+
+    /// @dev Metadata should meet specs
+    function testMeta() public view {
+        assertEq(snapShotExecutor.oracle(), oracle, "Unexpected oracle address");
+        assertEq(snapShotExecutor.waitingPeriod(), 3 days, "Unexpected waitingPeriod");
+        assertEq(snapShotExecutor.cancelPeriod(), 2 days, "Unexpected cancelPeriod");
+        assertEq(snapShotExecutor.pendingProposalCount(), 0, "Unexpected pendingProposalCount");
+        assertEq(snapShotExecutor.pendingProposalLimit(), 3, "Unexpected pendingProposalLimit");
+    }
+
+    /// @dev BorgAuth instances should be properly assigned and configured
+    function testAuth() public {
+        assertEq(address(snapShotExecutor.AUTH()), address(auth), "Unexpected SnapShotExecutor auth");
+
+        uint256 ownerRole = auth.OWNER_ROLE();
+
+        // Verify owners
+        auth.onlyRole(ownerRole, owner);
+
+        // Verify not owners
+        vm.expectRevert(abi.encodeWithSelector(BorgAuth.BorgAuth_NotAuthorized.selector, ownerRole, address(this)));
+        auth.onlyRole(ownerRole, address(this));
+    }
+
+    /// @dev Normal proposal workflow should pass
+    function testNormalProposal() public {
+        deal(address(snapShotExecutor), 1 ether);
+
+        // Proposal by oracle should pass
+
+        vm.prank(oracle);
+        vm.expectEmit();
+        emit ProposalCreated(
+            keccak256(abi.encodePacked(alice, uint256(1 ether), "", "Send alice 1 ether")),
+            alice, 1 ether, "", "Send alice 1 ether", block.timestamp + 3 days
+        );
+        bytes32 proposalId = snapShotExecutor.propose(
+            address(alice), // target
+            1 ether, // value
+            "", // cdata
+            "Send alice 1 ether"
+        );
+        assertEq(snapShotExecutor.pendingProposalCount(), 1, "Expect 1 pending proposal");
+        (address target, uint256 value, bytes memory cdata, string memory description, uint256 timestamp) = snapShotExecutor.pendingProposals(proposalId);
+        assertEq(target, alice, "Expect valid pending proposal details");
+        assertEq(value, 1 ether, "Expect valid pending proposal details");
+        assertEq(cdata, "", "Expect valid pending proposal details");
+        assertEq(description, "Send alice 1 ether", "Expect valid pending proposal details");
+        assertEq(timestamp, block.timestamp + 3 days, "Expect valid pending proposal details");
+
+        // execute() should fail within waiting period
+
+        vm.expectRevert(abi.encodeWithSelector(SnapShotExecutor.SnapShotExecutor_WaitingPeriod.selector));
+        vm.prank(owner);
+        snapShotExecutor.execute(proposalId);
+
+        // After waiting period
+        skip(snapShotExecutor.waitingPeriod());
+
+        // execute() should fail if not executed from owner
+        vm.expectRevert(abi.encodeWithSelector(BorgAuth.BorgAuth_NotAuthorized.selector, auth.OWNER_ROLE(), address(this)));
+        snapShotExecutor.execute(proposalId);
+
+        // execute() should succeed if executed from owner
+        
+        vm.expectEmit();
+        emit ProposalExecuted(proposalId, alice, 1 ether, "", "Send alice 1 ether", timestamp, true);
+        vm.prank(owner);
+        snapShotExecutor.execute(proposalId);
+
+        assertEq(alice.balance, 1 ether, "alice should receive 1 ether");
+        assertEq(snapShotExecutor.pendingProposalCount(), 0, "Expect 0 pending proposal");
+        {
+            (address newTarget, , , , ) = snapShotExecutor.pendingProposals(proposalId);
+            assertEq(newTarget, address(0), "Expect cleared pending proposal");
+        }
+    }
+
+    /// @dev Non-oracle should not be able to propose
+    function test_RevertIf_NotOracleProposal() public {
+        vm.expectRevert(abi.encodeWithSelector(SnapShotExecutor.SnapShotExecutor_NotAuthorized.selector));
+        snapShotExecutor.propose(
+            address(alice), // target
+            0, // value
+            "", // cdata
+            "Arbitrary instruction"
+        );
+    }
+
+    /// @dev Proposal can be cancelled by anyone after waiting + cancel period
+    function testCancelProposal() public {
+        deal(address(snapShotExecutor), 1 ether);
+
+        vm.prank(oracle);
+        bytes32 proposalId = snapShotExecutor.propose(
+            address(alice), // target
+            1 ether, // value
+            "", // cdata
+            "Send alice 1 ether"
+        );
+        (, , , , uint256 timestamp) = snapShotExecutor.pendingProposals(proposalId);
+
+        // cancel() should fail within waiting period
+
+        vm.expectRevert(abi.encodeWithSelector(SnapShotExecutor.SnapShotExecutor_WaitingPeriod.selector));
+        snapShotExecutor.cancel(proposalId);
+
+        // After waiting period
+        skip(snapShotExecutor.waitingPeriod());
+
+        // cancel() should fail within cancel period
+
+        vm.expectRevert(abi.encodeWithSelector(SnapShotExecutor.SnapShotExecutor_WaitingPeriod.selector));
+        snapShotExecutor.cancel(proposalId);
+
+        // After cancel period
+        skip(snapShotExecutor.cancelPeriod());
+
+        // cancel() should succeed now
+
+        vm.expectEmit();
+        emit ProposalCanceled(proposalId, alice, 1 ether, "", "Send alice 1 ether", timestamp);
+        snapShotExecutor.cancel(proposalId);
+
+        assertEq(address(snapShotExecutor).balance, 1 ether, "Proposal should not be executed");
+        assertEq(snapShotExecutor.pendingProposalCount(), 0, "Expect 0 pending proposal");
+        {
+            (address newTarget, , , , ) = snapShotExecutor.pendingProposals(proposalId);
+            assertEq(newTarget, address(0), "Expect cleared pending proposal");
+        }
+    }
+
+    /// @dev Pending proposal limit should be enforced
+    function test_RevertIf_ExceedPendingProposalLimit() public {
+        vm.startPrank(oracle);
+
+        snapShotExecutor.propose(
+            address(alice), // target
+            0, // value
+            "", // cdata
+            "Arbitrary instruction"
+        );
+        snapShotExecutor.propose(
+            address(alice), // target
+            0, // value
+            "", // cdata
+            "Arbitrary instruction"
+        );
+        snapShotExecutor.propose(
+            address(alice), // target
+            0, // value
+            "", // cdata
+            "Arbitrary instruction"
+        );
+
+        // Should failed due to the limit
+
+        vm.expectRevert(abi.encodeWithSelector(SnapShotExecutor.SnapShotExecutor_TooManyPendingProposals.selector));
+        snapShotExecutor.propose(
+            address(alice), // target
+            0, // value
+            "", // cdata
+            "Arbitrary instruction"
+        );
+
+        vm.stopPrank();
+    }
+}

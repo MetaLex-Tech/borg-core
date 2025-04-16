@@ -65,6 +65,18 @@ all coming operations as listed above will require approval of both `ychad.eth` 
 3. MetaLeX's Snapshot oracle will submit the results onchain to an executor contract (`SnapShotExecutor`), which will have the proposed transaction pending for co-approval
 4. `ychad.eth` will approve by executing the operation through the MetaLeX OS webapp
 
+## Key Parameters
+
+| ID                             | Value      | Descriptions                                            |
+|--------------------------------|------------|---------------------------------------------------------|
+| `borgIdentifier`               | Yearn BORG | BORG name                                               |
+| `borgMode`                     | blacklist  | Every operation is allowed unless blacklisted           |
+| `borgType`                     | 3          |                                                         |
+| `snapShotWaitingPeriod`        | 3 days     | Waiting period before a proposal can be executed        |
+| `snapShotCancelPeriod`         | 2 days     | Extra waiting period before a proposal can be cancelled |
+| `snapShotPendingProposalLimit` | 3          | Maximum pending proposals                               |
+| `oracle`                       | `address`  | MetaLeX Snapshot oracle                                 |
+
 ## Deployment
 
 1. Run the deploy script
