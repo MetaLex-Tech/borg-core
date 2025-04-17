@@ -6,7 +6,7 @@ import "openzeppelin/contracts/utils/Address.sol";
 
 contract SnapShotExecutor is BorgAuthACL {
 
-    address public oracle; // TODO Need to be transferrable for future on-chain governance upgrades
+    address public oracle;
     uint256 public waitingPeriod;
     uint256 public cancelPeriod;
     uint256 public pendingProposalCount;

@@ -1,6 +1,6 @@
 # Yearn BORG
 
-## BORG Architectures (TBD)
+## BORG Architectures
 
 ```mermaid
 graph TD
@@ -14,14 +14,14 @@ graph TD
 
     subgraph implants["Implants (Modules)"]
         ejectImplant{{Eject Implant}}
-        sudoImplant{{"(WIP) Sudo Implant"}}
+        sudoImplant{{Sudo Implant}}
     end
      
     snapshotExecutor[SnapshotExecutor]
     
     borg -->|"guard"| ychad
 
-    ychad -->|"owner<br>execute(proposal)"| snapshotExecutor
+    ychad -->|"owner<br>execute(proposalId)"| snapshotExecutor
     
     %% implants -->|modules| ychad
     
@@ -50,7 +50,7 @@ graph TD
     class yearnDaoVoting yearn;
 ```
 
-## Restricted Admin Workflows (TBD)
+## Restricted Admin Workflows
 
 `ychad.eth` will be prohibited from unilaterally performing the following admin operations:
 
@@ -63,20 +63,22 @@ all coming operations as listed above will require approval of both `ychad.eth` 
 
 1. Operation is initiated on the MetaLeX OS webapp
 2. A Snapshot proposal will be submitted via API using Yearn's existing voting settings
-3. MetaLeX's Snapshot oracle (`oracle`) will submit the results onchain to an executor contract (`SnapShotExecutor`), which will have the proposed transaction pending for co-approval
-4. `ychad.eth` will co-approve it by executing the operation through the MetaLeX OS webapp
+3. MetaLeX's Snapshot oracle (`oracle`) will submit the results on-chain to an executor contract (`SnapShotExecutor`), which will have the proposed transaction pending for co-approval
+4. After waiting period, `ychad.eth` can co-approve it by executing the operation through the MetaLeX OS webapp
+5. After an extra waiting period, anyone can cancel the proposal if it hasn't been executed
 
 ### Future On-chain Governance Transition
 
-The veYFI Snapshot governance will be replaced with on-chain governance at some point. Let's call the contract `YearnGovExecutor`. 
+The veYFI Snapshot governance will be replaced with on-chain governance at some point (ex. `YearnGovExecutor`). 
 To integrate with the co-approval process, `YearnGovExecutor` must satisfy:
 - Each proposal should have generic transaction fields (`target`, `value`, `calldata`) or equivalents so that `YearnGovExecutor` knows how to execute after the proposal is passed
-- Proposals related to the BORG [Restricted Admin Workflows](#restricted-admin-workflows-tbd) should be exclusively executed by `ychad.eth` because that's how the co-approval process is enforced
+- Proposals related to the BORG [Restricted Admin Workflows](#restricted-admin-workflows) should be exclusively executed by `ychad.eth` so it enforces the co-approval requirements
 
-The transition process is as follows:
+The transition process from Snapshot to on-chain governance is listed as follows:
 
 1. A final Snapshot proposal will be submitted to replace `SnapShotExecutor` with `YearnGovExecutor`. 
    More specifically, it is done by transferring `SudoImplant`'s and `EjectImplant`'s owner to `YearnGovExecutor`
+2. Once co-approved and executed by `ychad.eth`, the transition process is complete
 
 After the transition, the co-approval process will become:
 
@@ -115,9 +117,15 @@ After the transition, the co-approval process will become:
       to: 0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52
       value: 0
       data:
-   0x610b5925000000000000000000000000777b947b1821c34ee94d7d09c82e56f8008a0e08
+   0x610b59250000000000000000000000006faa027c062868424287af2faef3ddaca802bff7
 
     # 1
+      to: 0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52
+      value: 0
+      data:
+   0x610b5925000000000000000000000000a21f6d7aa0b320b8669caef53f790b1a2ac838d7
+   
+    # 2
       to: 0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52
       value: 0
       data:
