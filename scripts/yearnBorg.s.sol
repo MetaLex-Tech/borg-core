@@ -101,42 +101,10 @@ contract YearnBorgDeployScript is Script {
         core.addPolicyMethod(address(ychadSafe), "enableModule(address)");
         core.addPolicyMethod(address(ychadSafe), "disableModule(address,address)");
 
-        // BORG admin
-
-        bytes32[] memory matches = new bytes32[](1);
-        matches[0] = keccak256(abi.encodePacked(address(ychadSafe)));
-
-        // Not allowed to remove ychad.eth itself from policy
-        core.addExactMatchParameterConstraint(
-            address(core),
-            "removeContract(address)",
-            borgCore.ParamType.ADDRESS,
-            matches,
-            16, // 4 + (32 - 20) = 16
-            20 // length of an address
-        );
-        // Not allowed to remove any ychad.eth function from policy
-        core.addExactMatchParameterConstraint(
-            address(core),
-            "removePolicyMethod(address,string)",
-            borgCore.ParamType.ADDRESS,
-            matches,
-            16, // 4 + (32 - 20) = 16
-            20 // length of an address
-        );
-        // Not allowed to remove any ychad.eth function parameter constraint from policy
-        core.addExactMatchParameterConstraint(
-            address(core),
-            "removeParameterConstraint(address,string,uint256)",
-            borgCore.ParamType.ADDRESS,
-            matches,
-            16, // 4 + (32 - 20) = 16
-            20 // length of an address
-        );
-
         // Create SnapShotExecutor
 
-        snapShotExecutor = new SnapShotExecutor(coreAuth, address(oracle), snapShotWaitingPeriod, snapShotCancelPeriod, snapShotPendingProposalLimit);
+        BorgAuth executorAuth = new BorgAuth();
+        snapShotExecutor = new SnapShotExecutor(executorAuth, address(oracle), snapShotWaitingPeriod, snapShotCancelPeriod, snapShotPendingProposalLimit);
 
         // Add modules
 
@@ -149,11 +117,14 @@ contract YearnBorgDeployScript is Script {
             true // _allowEjection
         );
 
-        // Transferring core ownership to the Safe itself
-        coreAuth.updateRole(address(ychadSafe), coreAuth.OWNER_ROLE());
+        // Burn core ownership
         coreAuth.zeroOwner();
 
-        // Transferring eject implant ownership to SnapShotExecutor
+        // Transfer executor ownership to ychad.eth
+        executorAuth.updateRole(address(ychadSafe), executorAuth.OWNER_ROLE());
+        executorAuth.zeroOwner();
+
+        // Transfer eject implant ownership to SnapShotExecutor
         ejectAuth.updateRole(address(snapShotExecutor), ejectAuth.OWNER_ROLE());
         ejectAuth.zeroOwner();
 

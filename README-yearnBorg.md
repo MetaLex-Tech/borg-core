@@ -18,8 +18,9 @@ graph TD
     end
      
     snapshotExecutor[SnapshotExecutor]
+    
+    borg -->|"guard"| ychad
 
-    ychad -->|"owner<br>guard by"| borg
     ychad -->|"owner<br>execute(proposal)"| snapshotExecutor
     
     %% implants -->|modules| ychad
@@ -54,9 +55,8 @@ graph TD
 `ychad.eth` will be prohibited from unilaterally performing the following admin operations:
 
 - Add / remove / swap signers / change threshold
-- Set Guards
-- Remove rules from Guard  
 - Add / disable Modules
+- Set Guards
 
 Except existing signers, Modules (BORG Implants), Guard (BORG Core) and its set rules,
 all coming operations as listed above will require approval of both `ychad.eth` and DAO, with process as such:

@@ -196,7 +196,7 @@ contract borgCore is BaseGuard, BorgAuthACL, IEIP4824 {
                         revert BORG_CORE_DelegateCallNotAuthorized();
                     }
 
-                    if(isMethodCallMatched(to, data))
+                    if(!isMethodCallAllowed(to, data))
                             revert BORG_CORE_MethodNotAuthorized();
 
                     if (!_checkCooldown(to, bytes4(data[:4]))) {
@@ -235,7 +235,7 @@ contract borgCore is BaseGuard, BorgAuthACL, IEIP4824 {
                     revert BORG_CORE_DelegateCallNotAuthorized();
                 }
                 if(!policy[to].fullAccessOrBlock)
-                    if(!isMethodCallMatched(to, data))
+                    if(!isMethodCallAllowed(to, data))
                         revert BORG_CORE_MethodNotAuthorized();
                 //Check Cooldown
                 if (!_checkCooldown(to, bytes4(data[:4]))) {
@@ -629,11 +629,11 @@ contract borgCore is BaseGuard, BorgAuthACL, IEIP4824 {
         emit ParameterConstraintRemoved(_contract, _methodSignature, _byteOffset);
     }
 
-    /// @dev Function to check if a contract method call matches the pattern
+    /// @dev Function to check if a contract method call is allowed
     /// @param _contract address, the address of the contract
     /// @param _methodCallData bytes, the data of the method call
     /// @return bool, true if the method call is allowed
-    function isMethodCallMatched(
+    function isMethodCallAllowed(
         address _contract,
         bytes calldata _methodCallData
     ) public view returns (bool) {
@@ -641,9 +641,12 @@ contract borgCore is BaseGuard, BorgAuthACL, IEIP4824 {
         bytes4 methodSelector = bytes4(_methodCallData[:4]);
         MethodConstraint storage methodConstraint = policy[_contract].methods[methodSelector];
 
-        if (!methodConstraint.enabled) {
+        if (!methodConstraint.enabled && borgMode == borgModes.whitelist)
             return false;
-        }
+
+
+        if(methodConstraint.enabled && methodConstraint.paramOffsets.length == 0 && borgMode == borgModes.blacklist)
+            return false;
 
         // Iterate through the whitelist constraints for the method
         for (uint256 i = 0; i < methodConstraint.paramOffsets.length;) { 

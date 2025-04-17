@@ -21,6 +21,8 @@ contract YearnBorgAcceptanceTest is Test {
 
     address oracle = 0xf00c0dE09574805389743391ada2A0259D6b7a00;
 
+    address deployer = address(0); // TODO Update after deployment
+
     uint256 testSignerPrivateKey = 1;
     address testSigner = vm.addr(testSignerPrivateKey);
     
@@ -37,9 +39,9 @@ contract YearnBorgAcceptanceTest is Test {
     function setUp() public virtual {
         // Assume Ethereum mainnet fork after block 22268905
 
-        core = borgCore(0xDeaDbeefdEAdbeefdEadbEEFdeadbeEFdEaDbeeF); // TODO WIP
-        eject = ejectImplant(0xDeaDbeefdEAdbeefdEadbEEFdeadbeEFdEaDbeeF); // TODO WIP
-        snapShotExecutor = SnapShotExecutor(0xDeaDbeefdEAdbeefdEadbEEFdeadbeEFdEaDbeeF); // TODO WIP
+        core = borgCore(0xDeaDbeefdEAdbeefdEadbEEFdeadbeEFdEaDbeeF); // TODO Update after deployment
+        eject = ejectImplant(0xDeaDbeefdEAdbeefdEadbEEFdeadbeEFdEaDbeeF); // TODO Update after deployment
+        snapShotExecutor = SnapShotExecutor(0xDeaDbeefdEAdbeefdEadbEEFdeadbeEFdEaDbeeF); // TODO Update after deployment
     }
 
     /// @dev BORG Core metadata should meet specs
@@ -52,15 +54,29 @@ contract YearnBorgAcceptanceTest is Test {
     /// @dev BorgAuth instances should be proper assigned and configured
     function testAuth() public {
         BorgAuth coreAuth = core.AUTH();
+        BorgAuth executorAuth = snapShotExecutor.AUTH();
         BorgAuth ejectAuth = eject.AUTH();
 
         assertNotEq(address(coreAuth), address(ejectAuth), "Core auth instance should not be the same as Eject Implant's");
-        assertEq(address(snapShotExecutor.AUTH()), address(coreAuth), "SnapShotExecutor auth should be core auth");
+        assertNotEq(address(coreAuth), address(executorAuth), "Core auth instance should not be the same as executor's");
 
         // Verify core auth roles
         {
             uint256 ownerRole = coreAuth.OWNER_ROLE();
+            // Verify not owners
+            vm.expectRevert(abi.encodeWithSelector(BorgAuth.BorgAuth_NotAuthorized.selector, ownerRole, address(ychadSafe)));
             coreAuth.onlyRole(ownerRole, address(ychadSafe));
+            vm.expectRevert(abi.encodeWithSelector(BorgAuth.BorgAuth_NotAuthorized.selector, ownerRole, address(deployer)));
+            coreAuth.onlyRole(ownerRole, address(deployer));
+        }
+
+        // Verify executor auth roles
+        {
+            uint256 ownerRole = executorAuth.OWNER_ROLE();
+            executorAuth.onlyRole(ownerRole, address(ychadSafe));
+            // Verify not owners
+            vm.expectRevert(abi.encodeWithSelector(BorgAuth.BorgAuth_NotAuthorized.selector, ownerRole, address(deployer)));
+            executorAuth.onlyRole(ownerRole, address(deployer));
         }
 
         // Verify eject auth roles
@@ -70,6 +86,8 @@ contract YearnBorgAcceptanceTest is Test {
             // Verify not owners
             vm.expectRevert(abi.encodeWithSelector(BorgAuth.BorgAuth_NotAuthorized.selector, ownerRole, address(ychadSafe)));
             ejectAuth.onlyRole(ownerRole, address(ychadSafe));
+            vm.expectRevert(abi.encodeWithSelector(BorgAuth.BorgAuth_NotAuthorized.selector, ownerRole, address(deployer)));
+            ejectAuth.onlyRole(ownerRole, address(deployer));
         }
     }
 
@@ -177,15 +195,6 @@ contract YearnBorgAcceptanceTest is Test {
 
         // Safe
         safeTxHelper.executeSingle(safeTxHelper.getGetThresholdData());
-
-        // BORG admin
-        safeTxHelper.executeSingle(safeTxHelper.getAddRecipientGuardData(
-            address(core), // to
-            alice, // recipient
-            1 ether // amount
-        ));
-        (, uint256 transactionLimit) = core.policyRecipients(alice);
-        assertEq(transactionLimit, 1 ether, "Recipient policy should be set");
     }
 
     /// @dev Safe should not be able to unilaterally perform restricted admin operations without DAO approval
@@ -226,24 +235,6 @@ contract YearnBorgAcceptanceTest is Test {
         );
         safeTxHelper.executeSingle(
             safeTxHelper.getDisableModuleData(address(0), address(eject)), // tx
-            abi.encodeWithSelector(borgCore.BORG_CORE_MethodNotAuthorized.selector) // expectRevertData
-        );
-
-        // BORG admin
-
-        // Not allowed to remove ychad.eth itself from policy
-        safeTxHelper.executeSingle(
-            safeTxHelper.getRemoveContractGuardData(address(core), address(ychadSafe)), // tx
-            abi.encodeWithSelector(borgCore.BORG_CORE_MethodNotAuthorized.selector) // expectRevertData
-        );
-        // Not allowed to remove any ychad.eth function from policy
-        safeTxHelper.executeSingle(
-            safeTxHelper.getRemovePolicyMethodGuardData(address(core), address(ychadSafe), "func()"), // tx
-            abi.encodeWithSelector(borgCore.BORG_CORE_MethodNotAuthorized.selector) // expectRevertData
-        );
-        // Not allowed to remove any ychad.eth function parameter constraint from policy
-        safeTxHelper.executeSingle(
-            safeTxHelper.getRemoveParameterConstraintGuardData(address(core), address(ychadSafe), "func(address)", 16), // tx
             abi.encodeWithSelector(borgCore.BORG_CORE_MethodNotAuthorized.selector) // expectRevertData
         );
     }
