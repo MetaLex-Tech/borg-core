@@ -90,6 +90,13 @@ contract SafeTxHelper is CommonBase {
         return txData;
     }
 
+    function getGetThresholdData() public view returns (GnosisTransaction memory) {
+        bytes memory cdata = abi.encodeWithSelector(
+            OwnerManager.getThreshold.selector
+        );
+        return GnosisTransaction({to: address(safe), value: 0, data: cdata});
+    }
+
     function getNativeTransferData(address to, uint256 amount) public view returns (GnosisTransaction memory) {
         // Send the value with no data
         GnosisTransaction memory txData = GnosisTransaction({to: to, value: amount, data: ""});
@@ -193,51 +200,61 @@ contract SafeTxHelper is CommonBase {
         return GnosisTransaction({to: address(safe), value: 0, data: cdata});
     }
 
-    function getAddRecipientGuardData(address to, address allow, uint256 amount) public view returns (GnosisTransaction memory) {
+    function getAddRecipientGuardData(address to, address _contract, uint256 amount) public view returns (GnosisTransaction memory) {
         bytes4 addRecipientMethod = bytes4(
             keccak256("addRecipient(address,uint256)")
         );
 
         bytes memory recData = abi.encodeWithSelector(
             addRecipientMethod,
-            address(allow),
+            address(_contract),
             amount
         );
         GnosisTransaction memory txData = GnosisTransaction({to: to, value: 0, data: recData});
         return txData;
     }
 
-    function getRemoveRecepientGuardData(address to, address allow) public view returns (GnosisTransaction memory) {
+    function getRemoveRecepientGuardData(address to, address _contract) public view returns (GnosisTransaction memory) {
         bytes4 removeRecepientMethod = bytes4(
             keccak256("removeRecepient(address)")
         );
 
         bytes memory recData = abi.encodeWithSelector(
             removeRecepientMethod,
-            address(allow)
+            address(_contract)
         );
         GnosisTransaction memory txData = GnosisTransaction({to: to, value: 0, data: recData});
         return txData;
     }
 
-    function getRemoveContractGuardData(address to, address allow) public view returns (GnosisTransaction memory) {
+    function getRemoveContractGuardData(address to, address _contract) public view returns (GnosisTransaction memory) {
         bytes4 removeContractMethod = bytes4(
             keccak256("removeContract(address)")
         );
 
         bytes memory recData = abi.encodeWithSelector(
             removeContractMethod,
-            address(allow)
+            address(_contract)
         );
         GnosisTransaction memory txData = GnosisTransaction({to: to, value: 0, data: recData});
         return txData;
     }
 
-    function getRemovePolicyMethodGuardData(address to, address allow, string memory methodSignature) public view returns (GnosisTransaction memory) {
+    function getRemovePolicyMethodGuardData(address to, address _contract, string memory methodSignature) public view returns (GnosisTransaction memory) {
         bytes memory cdata = abi.encodeWithSelector(
             borgCore.removePolicyMethod.selector,
-            allow,
+            _contract,
             methodSignature
+        );
+        return GnosisTransaction({to: to, value: 0, data: cdata});
+    }
+
+    function getRemoveParameterConstraintGuardData(address to, address _contract, string memory methodSignature, uint256 byteOffset) public view returns (GnosisTransaction memory) {
+        bytes memory cdata = abi.encodeWithSelector(
+            borgCore.removeParameterConstraint.selector,
+            _contract,
+            methodSignature,
+            byteOffset
         );
         return GnosisTransaction({to: to, value: 0, data: cdata});
     }

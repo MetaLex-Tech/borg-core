@@ -171,8 +171,27 @@ contract YearnBorgAcceptanceTest is Test {
         );
     }
 
+    /// @dev Safe should be able to unilaterally perform non-restricted admin operations without DAO approval
+    function testAllowedAdminOperations() public {
+        // The test cases are NOT exhaustive
+
+        // Safe
+        safeTxHelper.executeSingle(safeTxHelper.getGetThresholdData());
+
+        // BORG admin
+        safeTxHelper.executeSingle(safeTxHelper.getAddRecipientGuardData(
+            address(core), // to
+            alice, // recipient
+            1 ether // amount
+        ));
+        (, uint256 transactionLimit) = core.policyRecipients(alice);
+        assertEq(transactionLimit, 1 ether, "Recipient policy should be set");
+    }
+
     /// @dev Safe should not be able to unilaterally perform restricted admin operations without DAO approval
-    function test_RevertIf_DirectAdminOperations() public {
+    function test_RevertIf_RestrictedAdminOperations() public {
+        // The test cases are exhaustive
+
         // Safe.OwnerManager
 
         safeTxHelper.executeSingle(
@@ -210,6 +229,22 @@ contract YearnBorgAcceptanceTest is Test {
             abi.encodeWithSelector(borgCore.BORG_CORE_MethodNotAuthorized.selector) // expectRevertData
         );
 
-        // TODO BORG admin
+        // BORG admin
+
+        // Not allowed to remove ychad.eth itself from policy
+        safeTxHelper.executeSingle(
+            safeTxHelper.getRemoveContractGuardData(address(core), address(ychadSafe)), // tx
+            abi.encodeWithSelector(borgCore.BORG_CORE_MethodNotAuthorized.selector) // expectRevertData
+        );
+        // Not allowed to remove any ychad.eth function from policy
+        safeTxHelper.executeSingle(
+            safeTxHelper.getRemovePolicyMethodGuardData(address(core), address(ychadSafe), "func()"), // tx
+            abi.encodeWithSelector(borgCore.BORG_CORE_MethodNotAuthorized.selector) // expectRevertData
+        );
+        // Not allowed to remove any ychad.eth function parameter constraint from policy
+        safeTxHelper.executeSingle(
+            safeTxHelper.getRemoveParameterConstraintGuardData(address(core), address(ychadSafe), "func(address)", 16), // tx
+            abi.encodeWithSelector(borgCore.BORG_CORE_MethodNotAuthorized.selector) // expectRevertData
+        );
     }
 }
