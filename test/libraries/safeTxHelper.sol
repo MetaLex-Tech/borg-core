@@ -3,8 +3,11 @@
 pragma solidity 0.8.20;
 
 import {CommonBase} from "forge-std/Base.sol";
+import {OwnerManager} from "safe-contracts/base/OwnerManager.sol";
+import {ModuleManager} from "safe-contracts/base/ModuleManager.sol";
 import {BaseAllocation} from "metavest/BaseAllocation.sol";
 import "./safe.t.sol";
+import {borgCore} from "../../src/borgCore.sol";
 
 // TODO Similar codes are used in other test files as well, consider refactoring and merging them here
 contract SafeTxHelper is CommonBase {
@@ -63,6 +66,15 @@ contract SafeTxHelper is CommonBase {
         );
         GnosisTransaction memory txData = GnosisTransaction({to: address(safe), value: 0, data: cdata});
         return txData;
+    }
+
+    function getDisableModuleData(address prevModule, address module) public view returns (GnosisTransaction memory) {
+        bytes memory cdata = abi.encodeWithSelector(
+            ModuleManager.disableModule.selector,
+            prevModule,
+            module
+        );
+        return GnosisTransaction({to: address(safe), value: 0, data: cdata});
     }
 
     function getSetGuardData(address core) public view returns (GnosisTransaction memory) {
@@ -153,6 +165,34 @@ contract SafeTxHelper is CommonBase {
         return txData;
     }
 
+    function getRemoveOwnerData(address prevOwner, address owner) public view returns (GnosisTransaction memory) {
+        bytes memory cdata = abi.encodeWithSelector(
+            OwnerManager.removeOwner.selector,
+            prevOwner,
+            owner,
+            1
+        );
+        return GnosisTransaction({to: address(safe), value: 0, data: cdata});
+    }
+
+    function getSwapOwnerData(address prevOwner, address oldOwner, address newOwner) public view returns (GnosisTransaction memory) {
+        bytes memory cdata = abi.encodeWithSelector(
+            OwnerManager.swapOwner.selector,
+            prevOwner,
+            oldOwner,
+            newOwner
+        );
+        return GnosisTransaction({to: address(safe), value: 0, data: cdata});
+    }
+
+    function getChangeThresholdData(uint256 threshold) public view returns (GnosisTransaction memory) {
+        bytes memory cdata = abi.encodeWithSelector(
+            OwnerManager.changeThreshold.selector,
+            threshold
+        );
+        return GnosisTransaction({to: address(safe), value: 0, data: cdata});
+    }
+
     function getAddRecipientGuardData(address to, address allow, uint256 amount) public view returns (GnosisTransaction memory) {
         bytes4 addRecipientMethod = bytes4(
             keccak256("addRecipient(address,uint256)")
@@ -191,6 +231,15 @@ contract SafeTxHelper is CommonBase {
         );
         GnosisTransaction memory txData = GnosisTransaction({to: to, value: 0, data: recData});
         return txData;
+    }
+
+    function getRemovePolicyMethodGuardData(address to, address allow, string memory methodSignature) public view returns (GnosisTransaction memory) {
+        bytes memory cdata = abi.encodeWithSelector(
+            borgCore.removePolicyMethod.selector,
+            allow,
+            methodSignature
+        );
+        return GnosisTransaction({to: to, value: 0, data: cdata});
     }
 
     function getCreateGrantData(address opGrant, address token, address rec, uint256 amount) public view returns (GnosisTransaction memory) {

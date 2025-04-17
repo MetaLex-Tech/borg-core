@@ -171,12 +171,45 @@ contract YearnBorgAcceptanceTest is Test {
         );
     }
 
-//    /// @dev Safe should not be able to add/remove signer itself
-//    function test_RevertIf_DirectMemberManagement() public {
-//        safeTxHelper.executeSingle(
-//            safeTxHelper.getAddOwnerData(alice), // tx
-//            abi.encodeWithSelector(borgCore.BORG_CORE_MethodNotAuthorized.selector) // expectRevertData
-//        );
-//        // TODO It does not revert!
-//    }
+    /// @dev Safe should not be able to unilaterally perform restricted admin operations without DAO approval
+    function test_RevertIf_DirectAdminOperations() public {
+        // Safe.OwnerManager
+
+        safeTxHelper.executeSingle(
+            safeTxHelper.getAddOwnerData(alice), // tx
+            abi.encodeWithSelector(borgCore.BORG_CORE_MethodNotAuthorized.selector) // expectRevertData
+        );
+        safeTxHelper.executeSingle(
+            safeTxHelper.getRemoveOwnerData(address(0x1), testSigner), // tx
+            abi.encodeWithSelector(borgCore.BORG_CORE_MethodNotAuthorized.selector) // expectRevertData
+        );
+        safeTxHelper.executeSingle(
+            safeTxHelper.getSwapOwnerData(address(0x1), testSigner, alice), // tx
+            abi.encodeWithSelector(borgCore.BORG_CORE_MethodNotAuthorized.selector) // expectRevertData
+        );
+        safeTxHelper.executeSingle(
+            safeTxHelper.getChangeThresholdData(2), // tx
+            abi.encodeWithSelector(borgCore.BORG_CORE_MethodNotAuthorized.selector) // expectRevertData
+        );
+
+        // Safe.GuardManager
+
+        safeTxHelper.executeSingle(
+            safeTxHelper.getSetGuardData(address(0)), // tx
+            abi.encodeWithSelector(borgCore.BORG_CORE_MethodNotAuthorized.selector) // expectRevertData
+        );
+
+        // Safe.ModuleManager
+
+        safeTxHelper.executeSingle(
+            safeTxHelper.getAddModuleData(address(0)), // tx
+            abi.encodeWithSelector(borgCore.BORG_CORE_MethodNotAuthorized.selector) // expectRevertData
+        );
+        safeTxHelper.executeSingle(
+            safeTxHelper.getDisableModuleData(address(0), address(eject)), // tx
+            abi.encodeWithSelector(borgCore.BORG_CORE_MethodNotAuthorized.selector) // expectRevertData
+        );
+
+        // TODO BORG admin
+    }
 }
