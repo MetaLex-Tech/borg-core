@@ -307,6 +307,15 @@ contract SafeTxHelper is CommonBase {
         return txData;
     }
 
+    function getGuard(address safe) external view returns (address guard) {
+        // Workaround since getGuard() is not public:
+        // https://github.com/safe-global/safe-smart-account/blob/c4859f4182be9d3fad0e5b5853c26a013c8b43a2/contracts/base/GuardManager.sol#L83-L97
+
+        // keccak256("guard_manager.guard.address")
+        bytes32 GUARD_STORAGE_SLOT = 0x4a204f620c8c5ccdca3fd54d003badd85ba500436a431f0cbda4f558c93c34c8;
+        return address(uint160(uint256(vm.load(safe, GUARD_STORAGE_SLOT))));
+    }
+
     function getSignature(
         address to,
         uint256 value,

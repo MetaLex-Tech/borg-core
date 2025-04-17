@@ -17,7 +17,7 @@ contract YearnBorgTest is YearnBorgAcceptanceTest {
 
         // MetaLex to deploy new BORG contracts and generate corresponding Safe txs for ychad.eth
         GnosisTransaction[] memory safeTxs;
-        (core, eject, snapShotExecutor, safeTxs) = (new YearnBorgDeployScript()).run(testSignerPrivateKey);
+        (core, eject, sudo, snapShotExecutor, safeTxs) = (new YearnBorgDeployScript()).run(testSignerPrivateKey);
 
         // Simulate ychad.eth executing the provided Safe TXs (set guard & add module)
         safeTxHelper.executeBatch(safeTxs);

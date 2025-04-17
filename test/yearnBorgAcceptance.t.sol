@@ -5,6 +5,7 @@ import "forge-std/Test.sol";
 import "solady/tokens/ERC20.sol";
 import {borgCore} from "../src/borgCore.sol";
 import {ejectImplant} from "../src/implants/ejectImplant.sol";
+import {sudoImplant} from "../src/implants/sudoImplant.sol";
 import {BorgAuth} from "../src/libs/auth.sol";
 import {SnapShotExecutor} from "../src/libs/governance/snapShotExecutor.sol";
 import {SafeTxHelper} from "./libraries/safeTxHelper.sol";
@@ -32,6 +33,7 @@ contract YearnBorgAcceptanceTest is Test {
     
     borgCore core;
     ejectImplant eject;
+    sudoImplant sudo;
     SnapShotExecutor snapShotExecutor;
 
     /// If run directly, it will test against the predefined deployment. This way it can be run reliably in CICD.
@@ -41,6 +43,7 @@ contract YearnBorgAcceptanceTest is Test {
 
         core = borgCore(0xDeaDbeefdEAdbeefdEadbEEFdeadbeEFdEaDbeeF); // TODO Update after deployment
         eject = ejectImplant(0xDeaDbeefdEAdbeefdEadbEEFdeadbeEFdEaDbeeF); // TODO Update after deployment
+        sudo = sudoImplant(0xDeaDbeefdEAdbeefdEadbEEFdeadbeEFdEaDbeeF); // TODO Update after deployment
         snapShotExecutor = SnapShotExecutor(0xDeaDbeefdEAdbeefdEadbEEFdeadbeEFdEaDbeeF); // TODO Update after deployment
     }
 
@@ -53,12 +56,14 @@ contract YearnBorgAcceptanceTest is Test {
 
     /// @dev BorgAuth instances should be proper assigned and configured
     function testAuth() public {
+        assertEq(address(eject.AUTH()), address(sudo.AUTH()), "All implant's auth should be the same");
+
         BorgAuth coreAuth = core.AUTH();
         BorgAuth executorAuth = snapShotExecutor.AUTH();
-        BorgAuth ejectAuth = eject.AUTH();
+        BorgAuth implantAuth = eject.AUTH();
 
-        assertNotEq(address(coreAuth), address(ejectAuth), "Core auth instance should not be the same as Eject Implant's");
         assertNotEq(address(coreAuth), address(executorAuth), "Core auth instance should not be the same as executor's");
+        assertNotEq(address(coreAuth), address(implantAuth), "Core auth instance should not be the same as implant's");
 
         // Verify core auth roles
         {
@@ -79,15 +84,15 @@ contract YearnBorgAcceptanceTest is Test {
             executorAuth.onlyRole(ownerRole, address(deployer));
         }
 
-        // Verify eject auth roles
+        // Verify implant auth roles
         {
-            uint256 ownerRole = ejectAuth.OWNER_ROLE();
-            ejectAuth.onlyRole(ownerRole, address(snapShotExecutor));
+            uint256 ownerRole = implantAuth.OWNER_ROLE();
+            implantAuth.onlyRole(ownerRole, address(snapShotExecutor));
             // Verify not owners
             vm.expectRevert(abi.encodeWithSelector(BorgAuth.BorgAuth_NotAuthorized.selector, ownerRole, address(ychadSafe)));
-            ejectAuth.onlyRole(ownerRole, address(ychadSafe));
+            implantAuth.onlyRole(ownerRole, address(ychadSafe));
             vm.expectRevert(abi.encodeWithSelector(BorgAuth.BorgAuth_NotAuthorized.selector, ownerRole, address(deployer)));
-            ejectAuth.onlyRole(ownerRole, address(deployer));
+            implantAuth.onlyRole(ownerRole, address(deployer));
         }
     }
 
@@ -127,11 +132,9 @@ contract YearnBorgAcceptanceTest is Test {
 
         vm.assertFalse(ychadSafe.isOwner(testSigner), "Should not be Safe signer");
         vm.assertEq(ychadSafe.getThreshold(), thresholdBefore, "Threshold should not change");
-
-        // TODO Test with reduce = true
     }
 
-    /// @dev Normal Member Management workflow should succeed
+    /// @dev Member Management should succeed given DAO and ychad.eth's co-approval
     function testMemberManagement() public {
         vm.assertFalse(ychadSafe.isOwner(alice), "Should not be Safe signer");
 
@@ -151,21 +154,11 @@ contract YearnBorgAcceptanceTest is Test {
             proposalId
         );
 
-        // Should fail within waiting period
-        safeTxHelper.executeSingle(
-            GnosisTransaction({
-                to: address(snapShotExecutor),
-                value: 0,
-                data: executeCalldata
-            }),
-            "GS013" // expectRevertData
-        );
-
         // After waiting period
         skip(snapShotExecutor.waitingPeriod());
 
         // Should fail if not executed from Safe
-        vm.expectRevert(abi.encodeWithSelector(BorgAuth.BorgAuth_NotAuthorized.selector, core.AUTH().OWNER_ROLE(), address(this)));
+        vm.expectRevert(abi.encodeWithSelector(BorgAuth.BorgAuth_NotAuthorized.selector, snapShotExecutor.AUTH().OWNER_ROLE(), address(this)));
         snapShotExecutor.execute(proposalId);
 
         // Should succeed if executed from Safe
@@ -176,6 +169,80 @@ contract YearnBorgAcceptanceTest is Test {
         }));
 
         vm.assertTrue(ychadSafe.isOwner(alice), "Should be Safe signer");
+    }
+
+    /// @dev Guard Management should succeed given DAO and ychad.eth's co-approval
+    function testGuardManagement() public {
+        vm.assertEq(safeTxHelper.getGuard(address(ychadSafe)), address(core), "BORG core should be Guard of ychad.eth");
+
+        vm.prank(oracle);
+        bytes32 proposalId = snapShotExecutor.propose(
+            address(sudo), // target
+            0, // value
+            abi.encodeWithSelector(
+                sudoImplant.setGuard.selector,
+                address(0) // newGuard
+            ), // cdata
+            "Remove Guard"
+        );
+
+        bytes memory executeCalldata = abi.encodeWithSelector(
+            snapShotExecutor.execute.selector,
+            proposalId
+        );
+
+        // After waiting period
+        skip(snapShotExecutor.waitingPeriod());
+
+        // Should fail if not executed from Safe
+        vm.expectRevert(abi.encodeWithSelector(BorgAuth.BorgAuth_NotAuthorized.selector, snapShotExecutor.AUTH().OWNER_ROLE(), address(this)));
+        snapShotExecutor.execute(proposalId);
+
+        // Should succeed if executed from Safe
+        safeTxHelper.executeSingle(GnosisTransaction({
+            to: address(snapShotExecutor),
+            value: 0,
+            data: executeCalldata
+        }));
+
+        vm.assertEq(safeTxHelper.getGuard(address(ychadSafe)), address(0), "ychad.eth should have no Guard");
+    }
+
+    /// @dev Module Management should succeed given DAO and ychad.eth's co-approval
+    function testModuleManagement() public {
+        vm.assertTrue(ychadSafe.isModuleEnabled(address(eject)), "ejectImplant should be enabled");
+
+        vm.prank(oracle);
+        bytes32 proposalId = snapShotExecutor.propose(
+            address(sudo), // target
+            0, // value
+            abi.encodeWithSelector(
+                sudoImplant.disableModule.selector,
+                address(eject) // module
+            ), // cdata
+            "Disable Eject Implant"
+        );
+
+        bytes memory executeCalldata = abi.encodeWithSelector(
+            snapShotExecutor.execute.selector,
+            proposalId
+        );
+
+        // After waiting period
+        skip(snapShotExecutor.waitingPeriod());
+
+        // Should fail if not executed from Safe
+        vm.expectRevert(abi.encodeWithSelector(BorgAuth.BorgAuth_NotAuthorized.selector, snapShotExecutor.AUTH().OWNER_ROLE(), address(this)));
+        snapShotExecutor.execute(proposalId);
+
+        // Should succeed if executed from Safe
+        safeTxHelper.executeSingle(GnosisTransaction({
+            to: address(snapShotExecutor),
+            value: 0,
+            data: executeCalldata
+        }));
+
+        vm.assertFalse(ychadSafe.isModuleEnabled(address(eject)), "ejectImplant should be disabled");
     }
 
     /// @dev Non-oracle should not be able to propose

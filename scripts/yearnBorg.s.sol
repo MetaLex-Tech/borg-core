@@ -5,6 +5,7 @@ import {Script} from "forge-std/Script.sol";
 import {console2} from "forge-std/console2.sol";
 import {borgCore} from "../src/borgCore.sol";
 import {ejectImplant} from "../src/implants/ejectImplant.sol";
+import {sudoImplant} from "../src/implants/sudoImplant.sol";
 import {optimisticGrantImplant} from "../src/implants/optimisticGrantImplant.sol";
 import {daoVoteGrantImplant} from "../src/implants/daoVoteGrantImplant.sol";
 import {daoVetoGrantImplant} from "../src/implants/daoVetoGrantImplant.sol";
@@ -48,18 +49,21 @@ contract YearnBorgDeployScript is Script {
     SafeTxHelper safeTxHelper;
 
     borgCore core;
-    BorgAuth coreAuth;
-    BorgAuth ejectAuth;
     ejectImplant eject;
+    sudoImplant sudo;
     SnapShotExecutor snapShotExecutor;
 
+    BorgAuth coreAuth;
+    BorgAuth executorAuth;
+    BorgAuth implantAuth;
+
     /// @dev For running from `forge script`. Provide the deployer private key through env var.
-    function run() public returns(borgCore, ejectImplant, SnapShotExecutor, GnosisTransaction[] memory) {
+    function run() public returns(borgCore, ejectImplant, sudoImplant, SnapShotExecutor, GnosisTransaction[] memory) {
         return run(vm.envUint("DEPLOYER_PRIVATE_KEY"));
     }
 
     /// @dev For running in tests
-    function run(uint256 deployerPrivateKey) public returns(borgCore, ejectImplant, SnapShotExecutor, GnosisTransaction[] memory) {
+    function run(uint256 deployerPrivateKey) public returns(borgCore, ejectImplant, sudoImplant, SnapShotExecutor, GnosisTransaction[] memory) {
         console2.log("Deploy Configs:");
         console2.log("  BORG name:", borgIdentifier);
         console2.log("  BORG mode:", uint8(borgMode));
@@ -103,18 +107,22 @@ contract YearnBorgDeployScript is Script {
 
         // Create SnapShotExecutor
 
-        BorgAuth executorAuth = new BorgAuth();
+        executorAuth = new BorgAuth();
         snapShotExecutor = new SnapShotExecutor(executorAuth, address(oracle), snapShotWaitingPeriod, snapShotCancelPeriod, snapShotPendingProposalLimit);
 
         // Add modules
 
-        ejectAuth = new BorgAuth();
+        implantAuth = new BorgAuth();
         eject = new ejectImplant(
-            ejectAuth,
+            implantAuth,
             address(ychadSafe),
             address(new MockFailSafeImplant()), // _failSafe
             true, // _allowManagement
             true // _allowEjection
+        );
+        sudo = new sudoImplant(
+            implantAuth,
+            address(ychadSafe)
         );
 
         // Burn core ownership
@@ -125,23 +133,26 @@ contract YearnBorgDeployScript is Script {
         executorAuth.zeroOwner();
 
         // Transfer eject implant ownership to SnapShotExecutor
-        ejectAuth.updateRole(address(snapShotExecutor), ejectAuth.OWNER_ROLE());
-        ejectAuth.zeroOwner();
+        implantAuth.updateRole(address(snapShotExecutor), implantAuth.OWNER_ROLE());
+        implantAuth.zeroOwner();
 
         vm.stopBroadcast();
 
         console2.log("Deployed addresses:");
         console2.log("  Core: ", address(core));
-        console2.log("  Core Auth: ", address(coreAuth));
         console2.log("  Eject Implant: ", address(eject));
-        console2.log("  Eject Auth: ", address(ejectAuth));
+        console2.log("  Sudo Implant: ", address(sudo));
         console2.log("  SnapShotExecutor: ", address(snapShotExecutor));
+        console2.log("  Core Auth: ", address(coreAuth));
+        console2.log("  Executor Auth: ", address(executorAuth));
+        console2.log("  Implant Auth: ", address(implantAuth));
 
         // Prepare Safe TXs for ychad.eth to execute
 
-        GnosisTransaction[] memory safeTxs = new GnosisTransaction[](2);
+        GnosisTransaction[] memory safeTxs = new GnosisTransaction[](3);
         safeTxs[0] = safeTxHelper.getAddModuleData(address(eject));
-        safeTxs[1] = safeTxHelper.getSetGuardData(address(core)); // Note we must set guard last because it may block ychad.eth from adding any more modules
+        safeTxs[1] = safeTxHelper.getAddModuleData(address(sudo));
+        safeTxs[2] = safeTxHelper.getSetGuardData(address(core)); // Note we must set guard last because it may block ychad.eth from adding any more modules
 
         console2.log("Safe TXs:");
         for (uint256 i = 0 ; i < safeTxs.length ; i++) {
@@ -153,6 +164,6 @@ contract YearnBorgDeployScript is Script {
             console2.log("");
         }
 
-        return (core, eject, snapShotExecutor, safeTxs);
+        return (core, eject, sudo, snapShotExecutor, safeTxs);
     }
 }
