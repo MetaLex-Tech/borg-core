@@ -3,6 +3,7 @@ pragma solidity 0.8.20;
 
 import "forge-std/Test.sol";
 import "solady/tokens/ERC20.sol";
+import {Ownable} from "openzeppelin/contracts/access/Ownable.sol";
 import {borgCore} from "../src/borgCore.sol";
 import {ejectImplant} from "../src/implants/ejectImplant.sol";
 import {sudoImplant} from "../src/implants/sudoImplant.sol";
@@ -10,6 +11,33 @@ import {BorgAuth} from "../src/libs/auth.sol";
 import {SnapShotExecutor} from "../src/libs/governance/snapShotExecutor.sol";
 import {SafeTxHelper} from "./libraries/safeTxHelper.sol";
 import {IGnosisSafe, GnosisTransaction, IMultiSendCallOnly} from "../test/libraries/safe.t.sol";
+
+contract YearnGovExecutor is Ownable {
+    struct proposal {
+        address target;
+        uint256 value;
+        bytes cdata;
+        string description;
+    }
+
+    mapping(bytes32 => proposal) public pendingProposals;
+    
+    constructor(address owner) Ownable(owner) {}
+
+    // Propose for voting
+    function propose(address target, uint256 value, bytes calldata cdata, string memory description) external returns (bytes32) {
+        bytes32 proposalId = keccak256(abi.encodePacked(target, value, cdata, description));
+        pendingProposals[proposalId] = proposal(target, value, cdata, description);
+        return proposalId;
+    }
+
+    // Execute passed proposal (for testing we assume it always passes)
+    function execute(bytes32 proposalId) payable external onlyOwner() {
+        proposal memory p = pendingProposals[proposalId];
+        (bool success, ) = p.target.call{value: p.value}(p.cdata);
+        delete pendingProposals[proposalId];
+    }
+}
 
 contract YearnBorgAcceptanceTest is Test {
     ERC20 weth = ERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2); // Ethereum mainnet
@@ -149,11 +177,6 @@ contract YearnBorgAcceptanceTest is Test {
             "Add Alice as new signer"
         );
 
-        bytes memory executeCalldata = abi.encodeWithSelector(
-            snapShotExecutor.execute.selector,
-            proposalId
-        );
-
         // After waiting period
         skip(snapShotExecutor.waitingPeriod());
 
@@ -165,7 +188,10 @@ contract YearnBorgAcceptanceTest is Test {
         safeTxHelper.executeSingle(GnosisTransaction({
             to: address(snapShotExecutor),
             value: 0,
-            data: executeCalldata
+            data: abi.encodeWithSelector(
+                snapShotExecutor.execute.selector,
+                proposalId
+            )
         }));
 
         vm.assertTrue(ychadSafe.isOwner(alice), "Should be Safe signer");
@@ -186,11 +212,6 @@ contract YearnBorgAcceptanceTest is Test {
             "Remove Guard"
         );
 
-        bytes memory executeCalldata = abi.encodeWithSelector(
-            snapShotExecutor.execute.selector,
-            proposalId
-        );
-
         // After waiting period
         skip(snapShotExecutor.waitingPeriod());
 
@@ -202,7 +223,10 @@ contract YearnBorgAcceptanceTest is Test {
         safeTxHelper.executeSingle(GnosisTransaction({
             to: address(snapShotExecutor),
             value: 0,
-            data: executeCalldata
+            data: abi.encodeWithSelector(
+                snapShotExecutor.execute.selector,
+                proposalId
+            )
         }));
 
         vm.assertEq(safeTxHelper.getGuard(address(ychadSafe)), address(0), "ychad.eth should have no Guard");
@@ -223,11 +247,6 @@ contract YearnBorgAcceptanceTest is Test {
             "Disable Eject Implant"
         );
 
-        bytes memory executeCalldata = abi.encodeWithSelector(
-            snapShotExecutor.execute.selector,
-            proposalId
-        );
-
         // After waiting period
         skip(snapShotExecutor.waitingPeriod());
 
@@ -239,10 +258,116 @@ contract YearnBorgAcceptanceTest is Test {
         safeTxHelper.executeSingle(GnosisTransaction({
             to: address(snapShotExecutor),
             value: 0,
-            data: executeCalldata
+            data: abi.encodeWithSelector(
+                snapShotExecutor.execute.selector,
+                proposalId
+            )
         }));
 
         vm.assertFalse(ychadSafe.isModuleEnabled(address(eject)), "ejectImplant should be disabled");
+    }
+
+    /// @dev Transition to on-chain governance should be successful with co-approval
+    function testOnChainGovernanceTransition() public {
+        YearnGovExecutor yearnGovExecutor = new YearnGovExecutor(address(ychadSafe));
+
+        BorgAuth implantAuth = eject.AUTH();
+        uint256 ownerRole = implantAuth.OWNER_ROLE();
+
+        // Should not be owner yet
+        vm.expectRevert(abi.encodeWithSelector(BorgAuth.BorgAuth_NotAuthorized.selector, ownerRole, address(yearnGovExecutor)));
+        implantAuth.onlyRole(ownerRole, address(yearnGovExecutor));
+
+        // Simulate on-chain governance transition
+        {
+            // Need two proposals for complete owner transfer
+
+            vm.prank(oracle);
+            bytes32 proposalId0 = snapShotExecutor.propose(
+                address(implantAuth), // target
+                0, // value
+                abi.encodeWithSelector(
+                    implantAuth.updateRole.selector,
+                    address(yearnGovExecutor),
+                    ownerRole
+                ), // cdata
+                "Add yearnGovExecutor as owner"
+            );
+
+            vm.prank(oracle);
+            bytes32 proposalId1 = snapShotExecutor.propose(
+                address(implantAuth), // target
+                0, // value
+                abi.encodeWithSelector(
+                    implantAuth.zeroOwner.selector,
+                    address(yearnGovExecutor),
+                    ownerRole
+                ), // cdata
+                "Remove SnapShotExecutor from owner"
+            );
+
+            // After waiting period
+            skip(snapShotExecutor.waitingPeriod());
+
+            // Should succeed if executed from Safe
+
+            GnosisTransaction[] memory safeTxs = new GnosisTransaction[](2);
+            safeTxs[0] = GnosisTransaction({ // Add yearnGovExecutor as owner
+                to: address(snapShotExecutor),
+                value: 0,
+                data: abi.encodeWithSelector(
+                    snapShotExecutor.execute.selector,
+                    proposalId0
+                )
+            });
+            safeTxs[1] = GnosisTransaction({ // Remove SnapShotExecutor as owner
+                to: address(snapShotExecutor),
+                value: 0,
+                data: abi.encodeWithSelector(
+                    snapShotExecutor.execute.selector,
+                    proposalId1
+                )
+            });
+            safeTxHelper.executeBatch(safeTxs);
+
+            // YearnGovExecutor should be the owner now
+            implantAuth.onlyRole(ownerRole, address(yearnGovExecutor));
+            // SnapShotExecutor should no longer be an owner
+            vm.expectRevert(abi.encodeWithSelector(BorgAuth.BorgAuth_NotAuthorized.selector, ownerRole, address(snapShotExecutor)));
+            implantAuth.onlyRole(ownerRole, address(snapShotExecutor));
+        }
+
+        // Simulate adding member through on-chain governance
+        {
+            vm.assertFalse(ychadSafe.isOwner(alice), "Should not be Safe signer");
+
+            // Simulate a proposal (and it is immediately passed)
+            bytes32 proposalId = yearnGovExecutor.propose(
+                address(eject), // target
+                0, // value
+                abi.encodeWithSelector(
+                    bytes4(keccak256("addOwner(address)")),
+                    alice // newOwner
+                ), // cdata
+                "Add Alice as new signer"
+            );
+
+            // Should fail if not executed from ychad.eth
+            vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, address(this)));
+            yearnGovExecutor.execute(proposalId);
+
+            // Should succeed if executed from ychad.eth
+            safeTxHelper.executeSingle(GnosisTransaction({
+                to: address(yearnGovExecutor),
+                value: 0,
+                data: abi.encodeWithSelector(
+                    yearnGovExecutor.execute.selector,
+                    proposalId
+                )
+            }));
+
+            vm.assertTrue(ychadSafe.isOwner(alice), "Should be Safe signer");
+        }
     }
 
     /// @dev Non-oracle should not be able to propose
