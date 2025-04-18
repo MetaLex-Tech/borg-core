@@ -37,7 +37,7 @@ contract YearnBorgDeployScript is Script {
     IGnosisSafe ychadSafe = IGnosisSafe(0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52); // ychad.eth
     string borgIdentifier = "Yearn BORG"; // TODO WIP Ask for confirmation
     borgCore.borgModes borgMode = borgCore.borgModes.blacklist;
-    uint256 borgType = 0x3; // TODO WIP Ask for confirmation
+    uint256 borgType = 0x3; // devBORG
 
     // Configs: SnapShowExecutor
 
