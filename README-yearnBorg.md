@@ -58,9 +58,18 @@ graph TD
     class yearnDaoVoting yearn;
 ```
 
+## Initial BORGing of ychad
+
+To implement the BORG, ychad unilaterally: 
+- determines initial signer set (i.e., keep existing signers)
+- approves/adopts legal agreements (Cayman Foundation)
+- installs SAFE modules (BORG implants) and guard (BORG core)
+
+If desired, can seek prior DAO social approval for these changes (and this is likely best for legitimacy), but no DAO onchain actions or legal actions are required. 
+
 ## Restricted Admin Operations
 
-`ychad.eth` will be prohibited from unilaterally performing the following admin operations:
+Once ychad is "BORGed", the following actions will require bilateral approval of the DAO and ychad. Onchain, this means 'blacklisting' certain unilateral SAFE operations that would otherwise be possible, instead requiring DAO/ychad co-approval of such actions:
 
 - Add / remove / swap signers / change threshold
 - Add / disable Modules
@@ -68,14 +77,15 @@ graph TD
 
 ### Co-approval Workflows
 
-Except existing signers, Modules (BORG Implants), Guard (BORG Core) and its set rules,
-all coming operations listed above will require approval of both `ychad.eth` and DAO, with a process as such:
+The process for bilateral `ychad.eth` / DAO approvals will be as follows:
 
-1. Operation is initiated on the MetaLeX OS webapp
+1. Operation is initiated on the MetaLeX OS webapp [can snapshot's UI also be used as a fallback option?]
 2. A Snapshot proposal will be submitted via API using Yearn's existing voting settings
-3. MetaLeX's Snapshot oracle (`oracle`) will submit the results on-chain to an executor contract (`Snapshot Executor`), which will have the proposed transaction pending for co-approval
+3. MetaLeX's Snapshot oracle (`oracle`) will submit the results on-chain to an executor contract (`Snapshot Executor`), which will have the proposed transaction pending for co-approval [let's discuss fallback options if our oracle were to go offline, let's discuss security measures around oracle]
 4. After a waiting period, `ychad.eth` can co-approve it by executing the operation through the MetaLeX OS webapp
 5. After an extra waiting period, anyone can cancel the proposal if it hasn't been executed
+
+This essentially means that ychad cannot 'breach' its basic 'agreement' with the DAO by changing the meta-governance rules (ychad signer membership, ychad approval threshold). It also adds an extra security layer as ychad members cannot collude to change these fundamental rules. All other operations would remain under ychad's sole discretion. 
 
 ### Future On-chain Governance Transition
 
@@ -91,9 +101,9 @@ The transition process from Snapshot to on-chain governance is listed as follows
 
 After the transition, the co-approval process will become:
 
-1. Operation is initiated on the MetaLeX OS webapp
+1. Operation is initiated on the MetaLeX OS webapp [discuss fallback options]
 2. An on-chain proposal will be submitted to `YearnGovExecutor`
-3. Once the vote passed, `ychad.eth` will co-approve it by executing the operation through the MetaLeX OS webapp
+3. Once the vote passed, `ychad.eth` will co-approve it by executing the operation through the MetaLeX OS webapp [discuss fallback options]
 
 ### Module Addition
 
@@ -104,12 +114,12 @@ New Modules grant `ychad.eth` privileges to bypass Guards restrictions, therefor
 In exceptional circumstances, `ychad.eth` can propose the removal of the Guard via [Co-approval Workflows](#co-approval-workflows).
 Upon DAO co-approval and execution, `ychad.eth` will no longer face any restriction on administrative operations.
 
-**⚠️ Warning**: Disabling a Module revokes `ychad.eth`'s priviledges. In particular, disabling `SudoImplant` will permanently eliminate `ychad.eth`'s ability to add new Modules or remove Guards.
+**⚠️ Warning**: Disabling a Module revokes `ychad.eth`'s privileges. In particular, disabling `SudoImplant` will permanently eliminate `ychad.eth`'s ability to add new Modules or remove Guards. [discuss]
 
 ## Member Self-resignation
 
 A `ychad.eth` member can unilaterally resign by calling `EjectImplant.selfEject(false)` without approval. The Safe contract ensures threshold validity. 
-Alternatively, the member can call `EjectImplant.selfEject(true)` to resign and simultaneously reduce the threshold by 1
+Alternatively, the member can call `EjectImplant.selfEject(true)` to resign and simultaneously reduce the threshold by 1 [wouldn't this require DAO co-approval as well since threshold is being changed?]
 
 ## Key Parameters
 
