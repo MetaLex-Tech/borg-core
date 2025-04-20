@@ -30,6 +30,7 @@ contract SudoImplantTest is Test {
     BorgAuth auth;
     borgCore core;
     sudoImplant sudo;
+    address anotherImplant;
     SignatureCondition globalCondition;
     SignatureCondition funcCondition;
 
@@ -45,6 +46,7 @@ contract SudoImplantTest is Test {
         auth = new BorgAuth();
         core = new borgCore(auth, 0x3, borgCore.borgModes.unrestricted, "Test BORG", address(safe));
         sudo = new sudoImplant(auth, address(safe));
+        anotherImplant = address(new sudoImplant(auth, address(safe)));
 
         {
             address[] memory signers = new address[](1);
@@ -81,6 +83,7 @@ contract SudoImplantTest is Test {
 
         // Add module
         safeTxHelper.executeSingle(safeTxHelper.getAddModuleData(address(sudo)));
+        safeTxHelper.executeSingle(safeTxHelper.getAddModuleData(address(anotherImplant)));
         safeTxHelper.executeSingle(safeTxHelper.getSetGuardData(address(core)));
     }
 
@@ -161,16 +164,16 @@ contract SudoImplantTest is Test {
 
     /// @dev Normal disable Module should succeed
     function testDisableModule() public {
-        assertTrue(safe.isModuleEnabled(address(sudo)), "Module should be enabled");
+        assertTrue(safe.isModuleEnabled(address(anotherImplant)), "Module should be enabled");
 
         // Non-owner should not be authorized
         vm.expectRevert(abi.encodeWithSelector(BorgAuth.BorgAuth_NotAuthorized.selector, auth.OWNER_ROLE(), address(this)));
-        sudo.disableModule(address(sudo));
+        sudo.disableModule(address(anotherImplant));
 
         // Function condition not met
         vm.expectRevert(abi.encodeWithSelector(ConditionManager.ConditionManager_ConditionNotMet.selector));
         vm.prank(owner);
-        sudo.disableModule(address(sudo));
+        sudo.disableModule(address(anotherImplant));
 
         // Function condition is met
         vm.prank(funcConditionSigner);
@@ -179,19 +182,24 @@ contract SudoImplantTest is Test {
         // Global condition not met
         vm.expectRevert(abi.encodeWithSelector(sudoImplant.sudoImplant_ConditionsNotMet.selector));
         vm.prank(owner);
-        sudo.disableModule(address(sudo));
+        sudo.disableModule(address(anotherImplant));
 
         // Global condition is met
         vm.prank(globalConditionSigner);
         globalCondition.sign();
 
-        // Otherwise it should succeed
-        vm.expectEmit();
-        emit ModuleDisabled(address(sudo));
+        // Self-disable is not allowed
+        vm.expectRevert(abi.encodeWithSelector(sudoImplant.sudoImplant_SelfDisablingNotAllowed.selector));
         vm.prank(owner);
         sudo.disableModule(address(sudo));
 
-        assertFalse(safe.isModuleEnabled(address(sudo)), "Module should be disabled");
+        // Otherwise it should succeed
+        vm.expectEmit();
+        emit ModuleDisabled(address(anotherImplant));
+        vm.prank(owner);
+        sudo.disableModule(address(anotherImplant));
+
+        assertFalse(safe.isModuleEnabled(address(anotherImplant)), "Module should be disabled");
     }
 
     /// @dev Should revert if module not found when disabling modules

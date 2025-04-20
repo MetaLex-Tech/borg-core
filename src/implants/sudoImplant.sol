@@ -20,6 +20,7 @@ contract sudoImplant is BaseImplant {
     error sudoImplant_ConditionsNotMet();
     error sudoImplant_FailedTransaction();
     error sudoImplant_ModuleNotFound();
+    error sudoImplant_SelfDisablingNotAllowed();
 
     event GuardChanged(address indexed newGuard);
     event ModuleEnabled(address indexed module);
@@ -72,6 +73,7 @@ contract sudoImplant is BaseImplant {
     /// @notice Disables a module for the Safe. for the Safe (implant owner-only)
     /// @param module Module to be removed
     function disableModule(address module) public onlyOwner conditionCheck {
+        if (module == address(this)) revert sudoImplant_SelfDisablingNotAllowed();
         if (!checkConditions("")) revert sudoImplant_ConditionsNotMet();
 
         // Find prevModule on the linked list
