@@ -280,10 +280,9 @@ contract YearnBorgAcceptanceTest is Test {
 
         // Simulate on-chain governance transition
         {
-            // Need two proposals for complete owner transfer
-
+            // SnapShotExecutor to add YearnGovExecutor as owner
             vm.prank(oracle);
-            bytes32 proposalId0 = snapShotExecutor.propose(
+            bytes32 proposalIdAddOwner = snapShotExecutor.propose(
                 address(implantAuth), // target
                 0, // value
                 abi.encodeWithSelector(
@@ -294,44 +293,44 @@ contract YearnBorgAcceptanceTest is Test {
                 "Add yearnGovExecutor as owner"
             );
 
-            vm.prank(oracle);
-            bytes32 proposalId1 = snapShotExecutor.propose(
-                address(implantAuth), // target
-                0, // value
-                abi.encodeWithSelector(
-                    implantAuth.zeroOwner.selector,
-                    address(yearnGovExecutor),
-                    ownerRole
-                ), // cdata
-                "Remove SnapShotExecutor from owner"
-            );
-
             // After waiting period
             skip(snapShotExecutor.waitingPeriod());
 
             // Should succeed if executed from Safe
-
-            GnosisTransaction[] memory safeTxs = new GnosisTransaction[](2);
-            safeTxs[0] = GnosisTransaction({ // Add yearnGovExecutor as owner
+            safeTxHelper.executeSingle(GnosisTransaction({
                 to: address(snapShotExecutor),
                 value: 0,
                 data: abi.encodeWithSelector(
                     snapShotExecutor.execute.selector,
-                    proposalId0
+                    proposalIdAddOwner
                 )
-            });
-            safeTxs[1] = GnosisTransaction({ // Remove SnapShotExecutor as owner
-                to: address(snapShotExecutor),
-                value: 0,
-                data: abi.encodeWithSelector(
-                    snapShotExecutor.execute.selector,
-                    proposalId1
-                )
-            });
-            safeTxHelper.executeBatch(safeTxs);
+            }));
 
-            // YearnGovExecutor should be the owner now
+            // YearnGovExecutor should be an owner now
             implantAuth.onlyRole(ownerRole, address(yearnGovExecutor));
+
+            // YearnGovExecutor to remove SnapShotExecutor's ownership
+            bytes32 proposalIdRemoveOwner = yearnGovExecutor.propose(
+                address(implantAuth), // target
+                0, // value
+                abi.encodeWithSelector(
+                    implantAuth.updateRole.selector,
+                    address(snapShotExecutor),
+                    0
+                ), // cdata
+                "Remove snapShotExecutor ownership"
+            );
+
+            // Execute the proposal
+            safeTxHelper.executeSingle(GnosisTransaction({
+                to: address(yearnGovExecutor),
+                value: 0,
+                data: abi.encodeWithSelector(
+                    yearnGovExecutor.execute.selector,
+                    proposalIdRemoveOwner
+                )
+            }));
+
             // SnapShotExecutor should no longer be an owner
             vm.expectRevert(abi.encodeWithSelector(BorgAuth.BorgAuth_NotAuthorized.selector, ownerRole, address(snapShotExecutor)));
             implantAuth.onlyRole(ownerRole, address(snapShotExecutor));
