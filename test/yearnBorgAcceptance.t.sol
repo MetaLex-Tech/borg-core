@@ -3,39 +3,67 @@ pragma solidity 0.8.20;
 
 import "forge-std/Test.sol";
 import "solady/tokens/ERC20.sol";
-import {Ownable} from "openzeppelin/contracts/access/Ownable.sol";
 import {borgCore} from "../src/borgCore.sol";
 import {ejectImplant} from "../src/implants/ejectImplant.sol";
 import {sudoImplant} from "../src/implants/sudoImplant.sol";
-import {BorgAuth} from "../src/libs/auth.sol";
+import {BorgAuth, BorgAuthACL} from "../src/libs/auth.sol";
 import {SnapShotExecutor} from "../src/libs/governance/snapShotExecutor.sol";
 import {SafeTxHelper} from "./libraries/safeTxHelper.sol";
 import {IGnosisSafe, GnosisTransaction, IMultiSendCallOnly} from "../test/libraries/safe.t.sol";
 
-contract YearnGovExecutor is Ownable {
-    struct proposal {
+contract MockYearnGovernance {
+    struct Proposal {
         address target;
         uint256 value;
         bytes cdata;
         string description;
     }
 
-    mapping(bytes32 => proposal) public pendingProposals;
-    
-    constructor(address owner) Ownable(owner) {}
+    mapping(bytes32 => Proposal) public proposals;
 
-    // Propose for voting
-    function propose(address target, uint256 value, bytes calldata cdata, string memory description) external returns (bytes32) {
-        bytes32 proposalId = keccak256(abi.encodePacked(target, value, cdata, description));
-        pendingProposals[proposalId] = proposal(target, value, cdata, description);
-        return proposalId;
+    // Assume this is how to get a proposal's content (including admin operation's data)
+    function getProposal(bytes32 proposalId) external returns (Proposal memory) {
+        return proposals[proposalId];
     }
 
-    // Execute passed proposal (for testing we assume it always passes)
+    // Assume this is how to verify a proposal is passed
+    function isProposalPassed(bytes32 proposalId) external returns (bool) {
+        return true;
+    }
+
+    // Assume this is how to propose an admin operation
+    function propose(Proposal calldata p) external returns (bytes32) {
+        bytes32 proposalId = keccak256(abi.encodePacked(p.target, p.value, p.cdata, p.description));
+        proposals[proposalId] = p;
+        return proposalId;
+    }
+}
+
+contract MockYearnGovernanceAdapter is BorgAuthACL {
+    error YearnGovernanceAdapter_ProposalNotPassed(bytes32 proposalId);
+    error YearnGovernanceAdapter_ProposalAlreadyExecuted(bytes32 proposalId);
+
+    MockYearnGovernance yearnGovernance;
+    mapping(bytes32 => bool) public proposalExecuted;
+
+    constructor(BorgAuth _auth, MockYearnGovernance _yearnGovernance) BorgAuthACL(_auth) {
+        yearnGovernance = _yearnGovernance;
+    }
+
+    // Only owner (ychad.eth) is allowed to execute the admin operation. This is part of the co-approval process.
     function execute(bytes32 proposalId) payable external onlyOwner() {
-        proposal memory p = pendingProposals[proposalId];
+        if (!yearnGovernance.isProposalPassed(proposalId)) {
+            revert YearnGovernanceAdapter_ProposalNotPassed(proposalId);
+        }
+
+        if (proposalExecuted[proposalId]) {
+            revert YearnGovernanceAdapter_ProposalAlreadyExecuted(proposalId);
+        }
+
+        MockYearnGovernance.Proposal memory p = yearnGovernance.getProposal(proposalId);
+        proposalExecuted[proposalId] = true;
+
         (bool success, ) = p.target.call{value: p.value}(p.cdata);
-        delete pendingProposals[proposalId];
     }
 }
 
@@ -269,28 +297,32 @@ contract YearnBorgAcceptanceTest is Test {
 
     /// @dev Transition to on-chain governance should be successful with co-approval
     function testOnChainGovernanceTransition() public {
-        YearnGovExecutor yearnGovExecutor = new YearnGovExecutor(address(ychadSafe));
+        // Yearn to deploy on-chain governance contract
+        MockYearnGovernance yearnGovernance = new MockYearnGovernance();
+
+        // MetaLeX to deploy adapter
+        MockYearnGovernanceAdapter yearnGovernanceAdapter = new MockYearnGovernanceAdapter(snapShotExecutor.AUTH(), yearnGovernance);
 
         BorgAuth implantAuth = eject.AUTH();
         uint256 ownerRole = implantAuth.OWNER_ROLE();
 
         // Should not be owner yet
-        vm.expectRevert(abi.encodeWithSelector(BorgAuth.BorgAuth_NotAuthorized.selector, ownerRole, address(yearnGovExecutor)));
-        implantAuth.onlyRole(ownerRole, address(yearnGovExecutor));
+        vm.expectRevert(abi.encodeWithSelector(BorgAuth.BorgAuth_NotAuthorized.selector, ownerRole, address(yearnGovernanceAdapter)));
+        implantAuth.onlyRole(ownerRole, address(yearnGovernanceAdapter));
 
         // Simulate on-chain governance transition
         {
-            // SnapShotExecutor to add YearnGovExecutor as owner
+            // SnapShotExecutor to add yearnGovernanceAdapter as owner
             vm.prank(oracle);
             bytes32 proposalIdAddOwner = snapShotExecutor.propose(
                 address(implantAuth), // target
                 0, // value
                 abi.encodeWithSelector(
                     implantAuth.updateRole.selector,
-                    address(yearnGovExecutor),
+                    address(yearnGovernanceAdapter),
                     ownerRole
                 ), // cdata
-                "Add yearnGovExecutor as owner"
+                "Add yearnGovernanceAdapter as owner"
             );
 
             // After waiting period
@@ -306,28 +338,28 @@ contract YearnBorgAcceptanceTest is Test {
                 )
             }));
 
-            // YearnGovExecutor should be an owner now
-            implantAuth.onlyRole(ownerRole, address(yearnGovExecutor));
+            // yearnGovernanceAdapter should be an owner now
+            implantAuth.onlyRole(ownerRole, address(yearnGovernanceAdapter));
 
-            // YearnGovExecutor to remove SnapShotExecutor's ownership
-            bytes32 proposalIdRemoveOwner = yearnGovExecutor.propose(
-                address(implantAuth), // target
-                0, // value
-                abi.encodeWithSelector(
+            // YearnGovernance to revoke SnapShotExecutor ownership
+            bytes32 proposalIdRevokeOwner = yearnGovernance.propose(MockYearnGovernance.Proposal({
+                target: address(implantAuth),
+                value: 0,
+                cdata: abi.encodeWithSelector(
                     implantAuth.updateRole.selector,
                     address(snapShotExecutor),
                     0
-                ), // cdata
-                "Remove snapShotExecutor ownership"
-            );
+                ),
+                description: "Revoke snapShotExecutor ownership"
+            }));
 
-            // Execute the proposal
+            // Execute the passed proposal
             safeTxHelper.executeSingle(GnosisTransaction({
-                to: address(yearnGovExecutor),
+                to: address(yearnGovernanceAdapter),
                 value: 0,
                 data: abi.encodeWithSelector(
-                    yearnGovExecutor.execute.selector,
-                    proposalIdRemoveOwner
+                    MockYearnGovernanceAdapter.execute.selector,
+                    proposalIdRevokeOwner
                 )
             }));
 
@@ -341,26 +373,26 @@ contract YearnBorgAcceptanceTest is Test {
             vm.assertFalse(ychadSafe.isOwner(alice), "Should not be Safe signer");
 
             // Simulate a proposal (and it is immediately passed)
-            bytes32 proposalId = yearnGovExecutor.propose(
-                address(eject), // target
-                0, // value
-                abi.encodeWithSelector(
+            bytes32 proposalId = yearnGovernance.propose(MockYearnGovernance.Proposal({
+                target: address(eject),
+                value: 0,
+                cdata: abi.encodeWithSelector(
                     bytes4(keccak256("addOwner(address)")),
                     alice // newOwner
-                ), // cdata
-                "Add Alice as new signer"
-            );
+                ),
+                description: "Add Alice as new signer"
+            }));
 
             // Should fail if not executed from ychad.eth
-            vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, address(this)));
-            yearnGovExecutor.execute(proposalId);
+            vm.expectRevert(abi.encodeWithSelector(BorgAuth.BorgAuth_NotAuthorized.selector, ownerRole, address(this)));
+            yearnGovernanceAdapter.execute(proposalId);
 
             // Should succeed if executed from ychad.eth
             safeTxHelper.executeSingle(GnosisTransaction({
-                to: address(yearnGovExecutor),
+                to: address(yearnGovernanceAdapter),
                 value: 0,
                 data: abi.encodeWithSelector(
-                    yearnGovExecutor.execute.selector,
+                    MockYearnGovernanceAdapter.execute.selector,
                     proposalId
                 )
             }));

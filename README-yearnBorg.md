@@ -79,21 +79,76 @@ all coming operations listed above will require approval of both `ychad.eth` and
 
 ### Future On-chain Governance Transition
 
-Yearn's Snapshot governance will be replaced with an on-chain governance at some point (ex. `YearnGovExecutor`).
-`YearnGovExecutor` (or its adapter) must satisfy the following requirements to integrate with the co-approval process:
-- Each proposal must include generic transaction fields (`target`, `value`, `calldata` or their equivalents) to enable `YearnGovExecutor` to execute the proposal upon approval
-- Proposals involving `ychad.eth` [Restricted Admin Operations](#restricted-admin-operations) must be executed solely by `ychad.eth` to enforce co-approval requirements
+Yearn's Snapshot-based governance will transition to an on-chain governance system (ex. `YearnGovernance`). 
+An adapter (`YearnGovernanceAdapter`) will be implemented by MetaLex to manage the implementation details on co-approval process. 
+To integrate successfully, `YearnGovernance` must meet the following requirements:
+
+- Each proposal has an unique ID (ex. `proposalId`)
+- `YearnGovernanceAdapter` can read the proposal's voting result and verify it is passed
+- `YearnGovernanceAdapter` can extract the admin operation (ex. `target`, `value`, `calldata` or equivalent) from the proposal
 
 The transition process from Snapshot to on-chain governance is listed as follows:
 
-1. A final Snapshot proposal will be submitted to replace `Snapshot Executor` with `YearnGovExecutor` by transferring ownership of `SudoImplant` and `EjectImplant` to `YearnGovExecutor`
-2. Once co-approved and executed by `ychad.eth`, the transition process is complete
+1. A final Snapshot proposal will be submitted to grant `YearnGovernanceAdapter` ownership of the implants 
+2. `ychad.eth` to co-approved and executed the proposal
+3. The first on-chain proposal will be submitted to revoke `SnapShotExecutor` ownership of the implants
+4. `ychad.eth` to co-approved and executed the proposal. The transition is now complete
 
 After the transition, the co-approval process will become:
 
 1. Operation is initiated on the MetaLeX OS webapp
 2. An on-chain proposal will be submitted to `YearnGovExecutor`
 3. Once the vote passed, `ychad.eth` will co-approve it by executing the operation through the MetaLeX OS webapp
+
+Below shows the changes of BORG architectures before/after on-chain governance transition:
+
+```mermaid
+graph TD
+    ychad[ychad.eth<br/>6/9 signers]
+    
+    subgraph offChainGovernance["Snapshot Governance (before)"]
+        yearnDaoVoting[Yearn DAO Voting Snapshot]
+        oracleAddr[oracle]
+        snapshotExecutor[Snapshot Executor]
+    end
+    
+    subgraph onChainGovernance["On-chain Governance (after)"]
+        yearnGovernance[Yearn Governance]
+        yearnGovernanceAdapter[Yearn Governance Adapter]
+    end
+    
+    subgraph implants["Implants (Modules)"]
+        ejectImplant{{Eject Implant}}
+        sudoImplant{{Sudo Implant}}
+    end
+    
+    ychad -->|"owner<br>execute(proposalId)"| snapshotExecutor
+    
+    oracleAddr -->|"oracle<br>propose(admin operation)"| snapshotExecutor      
+    oracleAddr -->|monitor| yearnDaoVoting
+    
+    snapshotExecutor -->|"owner<br>admin operation()"| implants
+    
+    ychad -->|"owner<br>execute(proposalId)"| yearnGovernanceAdapter
+    
+    yearnGovernanceAdapter -->|"verify voting results of proposalId<br>and extract the admin operation"| yearnGovernance
+    yearnGovernanceAdapter -->|"owner<br>admin operation()"| implants
+    
+    %% Styling (optional, Mermaid supports limited styling)
+    classDef default fill:#191918,stroke:#fff,stroke-width:2px,color:#fff;
+    classDef borg fill:#191918,stroke:#E1FE52,stroke-width:2px,color:#E1FE52;
+    classDef yearn fill:#191918,stroke:#2C68DB,stroke-width:2px,color:#2C68DB;
+    classDef safe fill:#191918,stroke:#76FB8D,stroke-width:2px,color:#76FB8D;
+    classDef todo fill:#191918,stroke:#F09B4A,stroke-width:2px,color:#F09B4A;
+    class ejectImplant borg;
+    class sudoImplant borg;
+    class snapshotExecutor borg;
+    class oracleAddr borg;
+    class yearnGovernanceAdapter borg;
+    class ychad yearn;
+    class yearnDaoVoting yearn;
+    class yearnGovernance yearn;
+```
 
 ### Module Addition
 
