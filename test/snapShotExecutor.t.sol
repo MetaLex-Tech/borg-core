@@ -13,7 +13,8 @@ contract SnapShotExecutorTest is Test {
 
     address owner = vm.addr(1);
     address oracle = vm.addr(2);
-    address alice = vm.addr(3);
+    address newOracle = vm.addr(3);
+    address alice = vm.addr(4);
 
     BorgAuth auth;
     SnapShotExecutor snapShotExecutor;
@@ -29,7 +30,8 @@ contract SnapShotExecutorTest is Test {
             oracle,
             3 days, // waitingPeriod
             2 days, // cancelPeriod
-            3 // pendingProposalLimit
+            3, // pendingProposalLimit
+            30 days // ttl
         );
 
         // Transferring auth ownership
@@ -40,10 +42,13 @@ contract SnapShotExecutorTest is Test {
     /// @dev Metadata should meet specs
     function testMeta() public view {
         assertEq(snapShotExecutor.oracle(), oracle, "Unexpected oracle address");
+        assertEq(snapShotExecutor.pendingOracle(), address(0), "Unexpected pending oracle address");
         assertEq(snapShotExecutor.waitingPeriod(), 3 days, "Unexpected waitingPeriod");
         assertEq(snapShotExecutor.cancelPeriod(), 2 days, "Unexpected cancelPeriod");
         assertEq(snapShotExecutor.pendingProposalCount(), 0, "Unexpected pendingProposalCount");
         assertEq(snapShotExecutor.pendingProposalLimit(), 3, "Unexpected pendingProposalLimit");
+        assertEq(snapShotExecutor.ORACLE_TTL(), 30 days, "Unexpected ORACLE_TTL");
+        assertEq(snapShotExecutor.lastOraclePingTimestamp(), block.timestamp, "Unexpected lastOraclePingTimestamp");
     }
 
     /// @dev BorgAuth instances should be properly assigned and configured
@@ -202,5 +207,64 @@ contract SnapShotExecutorTest is Test {
         );
 
         vm.stopPrank();
+    }
+
+    /// @dev Ping timestamp should update when oracle is working
+    function testPing() public {
+        uint256 lastOraclePingTimestamp = snapShotExecutor.lastOraclePingTimestamp();
+
+        // Non-oracle shouldn't be able to ping
+        vm.expectRevert(abi.encodeWithSelector(SnapShotExecutor.SnapShotExecutor_NotAuthorized.selector));
+        snapShotExecutor.ping();
+
+        // Last timestamp should update after a successful ping
+        skip(1 days);
+        vm.prank(oracle);
+        snapShotExecutor.ping();
+        assertEq(snapShotExecutor.lastOraclePingTimestamp(), lastOraclePingTimestamp + 1 days);
+
+        // Propose should also ping
+        skip(1 days);
+        vm.prank(oracle);
+        snapShotExecutor.propose(
+            address(alice), // target
+            0, // value
+            "", // cdata
+            "Arbitrary instruction"
+        );
+        assertEq(snapShotExecutor.lastOraclePingTimestamp(), lastOraclePingTimestamp + 2 days);
+    }
+
+    /// @dev Owner should be able to replace oracle if it's dead
+    function testTransferOracle() public {
+        skip(snapShotExecutor.ORACLE_TTL());
+        vm.prank(owner);
+        snapShotExecutor.transferOracle(newOracle);
+
+        // Old oracle should still work when the transfer is pending
+        vm.prank(oracle);
+        snapShotExecutor.ping();
+        assertEq(snapShotExecutor.oracle(), oracle);
+
+        // Non-oracle should still be unauthorized
+        vm.expectRevert(abi.encodeWithSelector(SnapShotExecutor.SnapShotExecutor_NotAuthorized.selector));
+        snapShotExecutor.ping();
+
+        // Transfer should be done after the new oracle interacts
+        vm.prank(newOracle);
+        snapShotExecutor.ping();
+        assertEq(snapShotExecutor.oracle(), newOracle);
+        assertEq(snapShotExecutor.pendingOracle(), address(0));
+        // Old oracle should no longer be authorized
+        vm.expectRevert(abi.encodeWithSelector(SnapShotExecutor.SnapShotExecutor_NotAuthorized.selector));
+        vm.prank(oracle);
+        snapShotExecutor.ping();
+    }
+
+    /// @dev Owner should not be able to replace oracle if it's not dead
+    function test_RevertIf_SetOracleNotDead() public {
+        vm.expectRevert(abi.encodeWithSelector(SnapShotExecutor.SnapShotExecutor_OracleNotDead.selector));
+        vm.prank(owner);
+        snapShotExecutor.transferOracle(newOracle);
     }
 }
