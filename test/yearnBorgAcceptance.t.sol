@@ -159,6 +159,12 @@ contract YearnBorgAcceptanceTest is Test {
         assertEq(snapShotExecutor.pendingProposalLimit(), 3, "Unexpected pendingProposalLimit");
     }
 
+    function testEjectImplantMeta() public {
+        assertEq(eject.failSafeSignerThreshold(), 0, "Unexpected failSafeSignerThreshold");
+        assertTrue(eject.ALLOW_AUTH_MANAGEMENT(), "Auth management should be allowed");
+        assertTrue(eject.ALLOW_AUTH_EJECT(), "Auth ejection should be allowed");
+    }
+
     /// @dev Safe normal operations should be unrestricted
     function testSafeOpUnrestricted() public {
         {

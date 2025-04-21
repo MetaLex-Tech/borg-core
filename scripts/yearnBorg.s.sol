@@ -17,13 +17,13 @@ import {SnapShotExecutor} from "../src/libs/governance/snapShotExecutor.sol";
 import {SafeTxHelper} from "../test/libraries/safeTxHelper.sol";
 import {IGnosisSafe, GnosisTransaction, IMultiSendCallOnly} from "../test/libraries/safe.t.sol";
 
-contract MockFailSafeImplant {
+contract PlaceholderFailSafeImplant {
     uint256 public immutable IMPLANT_ID = 0;
 
-    error MockFailSafeImplant_UnexpectedTrigger();
+    error PlaceholderFailSafeImplant_UnexpectedTrigger();
 
     function recoverSafeFunds() external {
-        revert MockFailSafeImplant_UnexpectedTrigger();
+        revert PlaceholderFailSafeImplant_UnexpectedTrigger();
     }
 }
 
@@ -116,7 +116,7 @@ contract YearnBorgDeployScript is Script {
         eject = new ejectImplant(
             implantAuth,
             address(ychadSafe),
-            address(new MockFailSafeImplant()), // _failSafe
+            address(new PlaceholderFailSafeImplant()), // Placeholder because Yearn BORG does not use failSafe
             true, // _allowManagement
             true // _allowEjection
         );
