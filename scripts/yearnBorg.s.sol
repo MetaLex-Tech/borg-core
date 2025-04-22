@@ -119,7 +119,8 @@ contract YearnBorgDeployScript is Script {
             address(ychadSafe),
             address(new PlaceholderFailSafeImplant()), // Placeholder because Yearn BORG does not use failSafe
             true, // _allowManagement
-            true // _allowEjection
+            true, // _allowEjection
+            false // _allowSelfEjectReduce
         );
         sudo = new sudoImplant(
             implantAuth,

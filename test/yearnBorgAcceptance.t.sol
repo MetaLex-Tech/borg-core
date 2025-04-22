@@ -164,6 +164,7 @@ contract YearnBorgAcceptanceTest is Test {
         assertEq(eject.failSafeSignerThreshold(), 0, "Unexpected failSafeSignerThreshold");
         assertTrue(eject.ALLOW_AUTH_MANAGEMENT(), "Auth management should be allowed");
         assertTrue(eject.ALLOW_AUTH_EJECT(), "Auth ejection should be allowed");
+        assertFalse(eject.ALLOW_AUTH_SELF_EJECT_REDUCE(), "Auth self-eject with reduce should not be allowed");
     }
 
     /// @dev Safe normal operations should be unrestricted
@@ -190,6 +191,12 @@ contract YearnBorgAcceptanceTest is Test {
         // Self-resign without changing threshold
         uint256 thresholdBefore = ychadSafe.getThreshold();
 
+        // Self-resign with threshold reduce should not be allowed
+        vm.expectRevert(abi.encodeWithSelector(ejectImplant.ejectImplant_ActionNotEnabled.selector));
+        vm.prank(testSigner);
+        eject.selfEject(true);
+
+        // Otherwise, it should pass
         vm.prank(testSigner);
         eject.selfEject(false);
 
