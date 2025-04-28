@@ -89,37 +89,41 @@ This essentially means that ychad cannot 'breach' its basic 'agreement' with the
 
 ### Future On-chain Governance Transition
 
-Yearn's Snapshot governance will be replaced with an on-chain governance at some point (ex. `YearnGovExecutor`).
-`YearnGovExecutor` (or its adapter) must satisfy the following requirements to integrate with the co-approval process:
-- Each proposal must include generic transaction fields (`target`, `value`, `calldata` or their equivalents) to enable `YearnGovExecutor` to execute the proposal upon approval
-- Proposals involving `ychad.eth` [Restricted Admin Operations](#restricted-admin-operations) must be executed solely by `ychad.eth` to enforce co-approval requirements
+Yearn's Snapshot governance will be replaced with an on-chain governance at some point (ex. `YearnGovExecutor`). 
+Technically, the transition is done by having `YearnGovExecutor` serve as the new `oracle`.
+Therefore, `YearnGovernance` must meet the following requirements: 
+
+- `YearnGovernance` can call `SnapShotExecutor.propose(target, value, cdata, description)`, which contains the instructions of the admin operation
 
 The transition process from Snapshot to on-chain governance is listed as follows:
 
-1. A final Snapshot proposal will be submitted to replace `Snapshot Executor` with `YearnGovExecutor` by transferring ownership of `SudoImplant` and `EjectImplant` to `YearnGovExecutor`
+1. A final Snapshot proposal will be submitted to assign `YearnGovExecutor` as the new oracle of `Snapshot Executor`
 2. Once co-approved and executed by `ychad.eth`, the transition process is complete
 
 After the transition, the co-approval process will become:
 
-1. Operation is initiated on the MetaLeX OS webapp [discuss fallback options]
+1. Operation is initiated on the MetaLeX OS webapp, or, alternatively, through a third-party UI if the calldata is prepared
 2. An on-chain proposal will be submitted to `YearnGovExecutor`
-3. Once the vote passed, `ychad.eth` will co-approve it by executing the operation through the MetaLeX OS webapp [discuss fallback options]
+3. Once the vote passed, `YearnGovExecutor` will propose the results to the executor contract (`Snapshot Executor`), which will have the proposed transaction pending for co-approval
+4. After a waiting period, `ychad.eth` can co-approve it by executing the operation through the MetaLeX OS webapp
+5. After an extra waiting period, anyone can cancel the proposal if it hasn't been executed
 
 ### Module Addition
 
 New Modules grant `ychad.eth` privileges to bypass Guards restrictions, therefore it requires DAO co-approval via [Co-approval Workflows](#co-approval-workflows).
 
-### Guard & Module Removal
+### Guard & Module Updates
 
 In exceptional circumstances, `ychad.eth` can propose the removal of the Guard via [Co-approval Workflows](#co-approval-workflows).
 Upon DAO co-approval and execution, `ychad.eth` will no longer face any restriction on administrative operations.
 
-**⚠️ Warning**: Disabling a Module revokes `ychad.eth`'s privileges. In particular, disabling `SudoImplant` will permanently eliminate `ychad.eth`'s ability to add new Modules or remove Guards. [discuss]
+Likewise, `ychad.eth` can propose adding or removing Modules through [Co-approval Workflows](#co-approval-workflows) as well. 
+For safety, it cannot remove the `SudoImplant` Module itself.
 
 ## Member Self-resignation
 
-A `ychad.eth` member can unilaterally resign by calling `EjectImplant.selfEject(false)` without approval. The Safe contract ensures threshold validity. 
-Alternatively, the member can call `EjectImplant.selfEject(true)` to resign and simultaneously reduce the threshold by 1 [wouldn't this require DAO co-approval as well since threshold is being changed?]
+A `ychad.eth` member can unilaterally resign by calling `EjectImplant.selfEject(false)` without approval. The Safe contract ensures threshold validity.
+Members are prohibited from calling `EjectImplant.selfEject(true)` as it would alter the multisig threshold. Consequently, they cannot self-resign when the remaining member count equals the threshold.
 
 ## Key Parameters
 
