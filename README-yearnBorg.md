@@ -79,9 +79,9 @@ Once ychad is "BORGed", the following actions will require bilateral approval of
 
 The process for bilateral `ychad.eth` / DAO approvals will be as follows:
 
-1. Operation is initiated on the MetaLeX OS webapp [can snapshot's UI also be used as a fallback option?]
+1. Operation is initiated on the MetaLeX OS webapp
 2. A Snapshot proposal will be submitted via API using Yearn's existing voting settings
-3. MetaLeX's Snapshot oracle (`oracle`) will submit the results on-chain to an executor contract (`Snapshot Executor`), which will have the proposed transaction pending for co-approval [let's discuss fallback options if our oracle were to go offline, let's discuss security measures around oracle]
+3. MetaLeX's Snapshot oracle (`oracle`) will submit the results on-chain to an executor contract (`Snapshot Executor`), which will have the proposed transaction pending for co-approval
 4. After a waiting period, `ychad.eth` can co-approve it by executing the operation through the MetaLeX OS webapp
 5. After an extra waiting period, anyone can cancel the proposal if it hasn't been executed
 
