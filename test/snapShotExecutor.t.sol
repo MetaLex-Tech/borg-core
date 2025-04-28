@@ -235,11 +235,22 @@ contract SnapShotExecutorTest is Test {
         assertEq(snapShotExecutor.lastOraclePingTimestamp(), lastOraclePingTimestamp + 2 days);
     }
 
-    /// @dev Owner should be able to replace oracle if it's dead
+    /// @dev Should be able to transfer oracle through a proposal
     function testTransferOracle() public {
-        skip(snapShotExecutor.ORACLE_TTL());
+        // Propose & execute the transfer
+        vm.prank(oracle);
+        bytes32 proposalId = snapShotExecutor.propose(
+            address(snapShotExecutor), // target
+            0 ether, // value
+            abi.encodeWithSelector(
+                snapShotExecutor.transferOracle.selector,
+                address(newOracle)
+            ), // cdata
+            "Transfer oracle"
+        );
+        skip(snapShotExecutor.waitingPeriod()); // After waiting period
         vm.prank(owner);
-        snapShotExecutor.transferOracle(newOracle);
+        snapShotExecutor.execute(proposalId);
 
         // Old oracle should still work when the transfer is pending
         vm.prank(oracle);
@@ -261,10 +272,43 @@ contract SnapShotExecutorTest is Test {
         snapShotExecutor.ping();
     }
 
-    /// @dev Owner should not be able to replace oracle if it's not dead
-    function test_RevertIf_SetOracleNotDead() public {
+    /// @dev Should not be able to transfer oracle if not through a proposal
+    function test_RevertIf_TransferOracleNotSelf() public {
+        vm.expectRevert(abi.encodeWithSelector(SnapShotExecutor.SnapShotExecutor_NotAuthorized.selector));
+        snapShotExecutor.transferOracle(newOracle);
+    }
+
+    /// @dev Owner should be able to replace dead oracle
+    function testTransferExpiredOracle() public {
+        // Let the old oracle expire, then transfer it
+        skip(snapShotExecutor.ORACLE_TTL());
+        vm.prank(owner);
+        snapShotExecutor.transferExpiredOracle(newOracle);
+
+        // Old oracle should still work when the transfer is pending
+        vm.prank(oracle);
+        snapShotExecutor.ping();
+        assertEq(snapShotExecutor.oracle(), oracle);
+
+        // Non-oracle should still be unauthorized
+        vm.expectRevert(abi.encodeWithSelector(SnapShotExecutor.SnapShotExecutor_NotAuthorized.selector));
+        snapShotExecutor.ping();
+
+        // Transfer should be done after the new oracle interacts
+        vm.prank(newOracle);
+        snapShotExecutor.ping();
+        assertEq(snapShotExecutor.oracle(), newOracle);
+        assertEq(snapShotExecutor.pendingOracle(), address(0));
+        // Old oracle should no longer be authorized
+        vm.expectRevert(abi.encodeWithSelector(SnapShotExecutor.SnapShotExecutor_NotAuthorized.selector));
+        vm.prank(oracle);
+        snapShotExecutor.ping();
+    }
+
+    /// @dev Owner should not be able to replace an oracle if it's not dead
+    function test_RevertIf_TransferExpiredOracleNotDead() public {
         vm.expectRevert(abi.encodeWithSelector(SnapShotExecutor.SnapShotExecutor_OracleNotDead.selector));
         vm.prank(owner);
-        snapShotExecutor.transferOracle(newOracle);
+        snapShotExecutor.transferExpiredOracle(newOracle);
     }
 }

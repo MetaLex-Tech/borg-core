@@ -12,30 +12,12 @@ import {SnapShotExecutor} from "../src/libs/governance/snapShotExecutor.sol";
 import {SafeTxHelper} from "./libraries/safeTxHelper.sol";
 import {IGnosisSafe, GnosisTransaction, IMultiSendCallOnly} from "../test/libraries/safe.t.sol";
 
-contract YearnGovExecutor is Ownable {
-    struct proposal {
-        address target;
-        uint256 value;
-        bytes cdata;
-        string description;
-    }
-
-    mapping(bytes32 => proposal) public pendingProposals;
-    
-    constructor(address owner) Ownable(owner) {}
-
-    // Propose for voting
-    function propose(address target, uint256 value, bytes calldata cdata, string memory description) external returns (bytes32) {
-        bytes32 proposalId = keccak256(abi.encodePacked(target, value, cdata, description));
-        pendingProposals[proposalId] = proposal(target, value, cdata, description);
-        return proposalId;
-    }
-
-    // Execute passed proposal (for testing we assume it always passes)
-    function execute(bytes32 proposalId) payable external onlyOwner() {
-        proposal memory p = pendingProposals[proposalId];
-        (bool success, ) = p.target.call{value: p.value}(p.cdata);
-        delete pendingProposals[proposalId];
+/// @dev For demonstration only. We are not opinionated on the implementation details of the actual on-chain governance contract as long as
+///  it passes along all necessary instructions through `SnapShotExecutor.propose()` after the voting is passed
+contract MockYearnGovExecutor {
+    // Again, the function signature does not have to be exact
+    function proposeToSnapshotExecutor(SnapShotExecutor snapShotExecutor, address target, uint256 value, bytes calldata cdata, string memory description) external returns (bytes32) {
+        return snapShotExecutor.propose(target, value, cdata, description);
     }
 }
 
@@ -283,7 +265,7 @@ contract YearnBorgAcceptanceTest is Test {
 
     /// @dev Transition to on-chain governance should be successful with co-approval
     function testOnChainGovernanceTransition() public {
-        YearnGovExecutor yearnGovExecutor = new YearnGovExecutor(address(ychadSafe));
+        MockYearnGovExecutor yearnGovExecutor = new MockYearnGovExecutor();
 
         BorgAuth implantAuth = eject.AUTH();
         uint256 ownerRole = implantAuth.OWNER_ROLE();
@@ -294,17 +276,16 @@ contract YearnBorgAcceptanceTest is Test {
 
         // Simulate on-chain governance transition
         {
-            // SnapShotExecutor to add YearnGovExecutor as owner
+            // SnapShotExecutor to assign YearnGovExecutor as the new oracle
             vm.prank(oracle);
-            bytes32 proposalIdAddOwner = snapShotExecutor.propose(
-                address(implantAuth), // target
+            bytes32 proposalIdTransferOracle = snapShotExecutor.propose(
+                address(snapShotExecutor), // target
                 0, // value
                 abi.encodeWithSelector(
-                    implantAuth.updateRole.selector,
-                    address(yearnGovExecutor),
-                    ownerRole
+                    snapShotExecutor.transferOracle.selector,
+                    address(yearnGovExecutor)
                 ), // cdata
-                "Add yearnGovExecutor as owner"
+                "Set yearnGovExecutor as new oracle"
             );
 
             // After waiting period
@@ -316,48 +297,23 @@ contract YearnBorgAcceptanceTest is Test {
                 value: 0,
                 data: abi.encodeWithSelector(
                     snapShotExecutor.execute.selector,
-                    proposalIdAddOwner
+                    proposalIdTransferOracle
                 )
             }));
 
-            // YearnGovExecutor should be an owner now
-            implantAuth.onlyRole(ownerRole, address(yearnGovExecutor));
-
-            // YearnGovExecutor to remove SnapShotExecutor's ownership
-            bytes32 proposalIdRemoveOwner = yearnGovExecutor.propose(
-                address(implantAuth), // target
-                0, // value
-                abi.encodeWithSelector(
-                    implantAuth.updateRole.selector,
-                    address(snapShotExecutor),
-                    0
-                ), // cdata
-                "Remove snapShotExecutor ownership"
-            );
-
-            // Execute the proposal
-            safeTxHelper.executeSingle(GnosisTransaction({
-                to: address(yearnGovExecutor),
-                value: 0,
-                data: abi.encodeWithSelector(
-                    yearnGovExecutor.execute.selector,
-                    proposalIdRemoveOwner
-                )
-            }));
-
-            // SnapShotExecutor should no longer be an owner
-            vm.expectRevert(abi.encodeWithSelector(BorgAuth.BorgAuth_NotAuthorized.selector, ownerRole, address(snapShotExecutor)));
-            implantAuth.onlyRole(ownerRole, address(snapShotExecutor));
+            // YearnGovExecutor should be a pending oracle now, and it will assume the oracle role the next time it interacts with snapShotExecutor
+            assertEq(snapShotExecutor.pendingOracle(), address(yearnGovExecutor), "yearnGovExecutor should be pending as new oracle");
         }
 
         // Simulate adding member through on-chain governance
         {
             vm.assertFalse(ychadSafe.isOwner(alice), "Should not be Safe signer");
 
-            // Simulate a proposal (and it is immediately passed)
-            bytes32 proposalId = yearnGovExecutor.propose(
+            // Assume the voting passed and `yearnGovExecutor` proposes to `snapShotExecutor`
+            bytes32 proposalId = yearnGovExecutor.proposeToSnapshotExecutor(
+                snapShotExecutor,
                 address(eject), // target
-                0, // value
+                0, //value
                 abi.encodeWithSelector(
                     bytes4(keccak256("addOwner(address)")),
                     alice // newOwner
@@ -365,16 +321,15 @@ contract YearnBorgAcceptanceTest is Test {
                 "Add Alice as new signer"
             );
 
-            // Should fail if not executed from ychad.eth
-            vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, address(this)));
-            yearnGovExecutor.execute(proposalId);
+            // After waiting period
+            skip(snapShotExecutor.waitingPeriod());
 
-            // Should succeed if executed from ychad.eth
+            // Safe should be able to execute it and add Alice as new signer
             safeTxHelper.executeSingle(GnosisTransaction({
-                to: address(yearnGovExecutor),
+                to: address(snapShotExecutor),
                 value: 0,
                 data: abi.encodeWithSelector(
-                    yearnGovExecutor.execute.selector,
+                    snapShotExecutor.execute.selector,
                     proposalId
                 )
             }));
@@ -442,5 +397,22 @@ contract YearnBorgAcceptanceTest is Test {
             safeTxHelper.getDisableModuleData(address(0), address(eject)), // tx
             abi.encodeWithSelector(borgCore.BORG_CORE_MethodNotAuthorized.selector) // expectRevertData
         );
+    }
+
+    /// @dev Safe should be able to replace a dead oracle
+    function testTransferExpiredOracle() public {
+        // Let the old oracle expire, then transfer it
+        skip(snapShotExecutor.ORACLE_TTL());
+
+        // Safe should be able to replace the dead oracle unilaterally
+        safeTxHelper.executeSingle(GnosisTransaction({
+            to: address(snapShotExecutor),
+            value: 0,
+            data: abi.encodeWithSelector(
+                snapShotExecutor.transferExpiredOracle.selector,
+                address(1) // new oracle
+            )
+        }));
+        assertEq(snapShotExecutor.pendingOracle(), address(1), "New oracle should be pending now");
     }
 }

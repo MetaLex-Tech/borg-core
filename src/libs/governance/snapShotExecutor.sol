@@ -97,7 +97,16 @@ contract SnapShotExecutor is BorgAuthACL {
         emit ProposalCanceled(proposalId, p.target, p.value, p.cdata, p.description, p.timestamp);
     }
 
-    function transferOracle(address newOracle) external onlyOwner() onlyDeadOracle() {
+    /// @dev Allow transferring oracle through a proposal. It must be called by `SnapShotExecutor` itself and the only way to do it is through propose()+execute().
+    ///  The new oracle accepts the transfer by calling any other onlyOracle() function
+    function transferOracle(address newOracle) external {
+        if (msg.sender != address(this)) revert SnapShotExecutor_NotAuthorized();
+        pendingOracle = newOracle;
+    }
+
+    /// @dev Called by the owner to salvage dead/non-responding oracle.
+    ///  The new oracle accepts the transfer by calling any other onlyOracle() function
+    function transferExpiredOracle(address newOracle) external onlyOwner() onlyDeadOracle() {
         pendingOracle = newOracle;
     }
 
