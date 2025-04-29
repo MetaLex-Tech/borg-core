@@ -2,13 +2,13 @@
 
 ## BORG Architectures
 
-| Entity            | Descriptions                                                                                                                 |
-|-------------------|------------------------------------------------------------------------------------------------------------------------------|
-| BORG Core         | A Safe Guard contract restricting `ychad.eth`'s administrative authority                                                     |
-| Eject Implant     | A Safe Module contract for `ychad.eth` member management, integrated with Snapshot Executor to enforce DAO co-approval       |
-| Sudo Implant      | A Safe Module contract for `ychad.eth` Guard/Module management, integrated with Snapshot Executor to enforce DAO co-approval |
-| Snapshot Executor | A smart contract enabling co-approval between a DAO and `ychad.eth`                                                          |
-| oracle            | A MetaLex service for coordinating Yearn Snapshot voting and recording results on-chain                                      |
+| Entity            | Descriptions                                                                                                                                                                |
+|-------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| BORG Core         | A Safe Guard contract restricting ychad's administrative authority                                                                                                          |
+| Eject Implant     | A Safe Module contract for ychad member management, integrated with Snapshot Executor to enforce DAO co-approval                                                            |
+| Sudo Implant      | A Safe Module contract for ychad Guard/Module management, integrated with Snapshot Executor to enforce DAO co-approval                                                      |
+| Snapshot Executor | A smart contract enabling co-approval between a DAO and ychad                                                                                                               |
+| oracle            | A MetaLex service for coordinating Yearn Snapshot voting and recording results on-chain. It is set to be replaced by Yearn's own on-chain governance contract in the future |
 
 ```mermaid
 graph TD
@@ -77,12 +77,12 @@ Once ychad is "BORGed", the following actions will require bilateral approval of
 
 ### Co-approval Workflows
 
-The process for bilateral `ychad.eth` / DAO approvals will be as follows:
+The process for bilateral ychad / DAO approvals will be as follows:
 
 1. Operation is initiated on the MetaLeX OS webapp
 2. A Snapshot proposal will be submitted via API using Yearn's existing voting settings
 3. MetaLeX's Snapshot oracle (`oracle`) will submit the results on-chain to an executor contract (`Snapshot Executor`), which will have the proposed transaction pending for co-approval
-4. After a waiting period, `ychad.eth` can co-approve it by executing the operation through the MetaLeX OS webapp
+4. After a waiting period, ychad can co-approve it by executing the operation through the MetaLeX OS webapp
 5. After an extra waiting period, anyone can cancel the proposal if it hasn't been executed
 
 This essentially means that ychad cannot 'breach' its basic 'agreement' with the DAO by changing the meta-governance rules (ychad signer membership, ychad approval threshold). It also adds an extra security layer as ychad members cannot collude to change these fundamental rules. All other operations would remain under ychad's sole discretion. 
@@ -98,44 +98,45 @@ Therefore, `YearnGovernance` must meet the following requirements:
 The transition process from Snapshot to on-chain governance is listed as follows:
 
 1. A final Snapshot proposal will be submitted to assign `YearnGovExecutor` as the new oracle of `Snapshot Executor`
-2. Once co-approved and executed by `ychad.eth`, the transition process is complete
+2. Once co-approved and executed by ychad, the transition process is complete
 
 After the transition, the co-approval process will become:
 
 1. Operation is initiated on the MetaLeX OS webapp, or, alternatively, through a third-party UI if the calldata is prepared
 2. An on-chain proposal will be submitted to `YearnGovExecutor`
 3. Once the vote passed, `YearnGovExecutor` will propose the results to the executor contract (`Snapshot Executor`), which will have the proposed transaction pending for co-approval
-4. After a waiting period, `ychad.eth` can co-approve it by executing the operation through the MetaLeX OS webapp
+4. After a waiting period, ychad can co-approve it by executing the operation through the MetaLeX OS webapp
 5. After an extra waiting period, anyone can cancel the proposal if it hasn't been executed
 
 ### Module Addition
 
-New Modules grant `ychad.eth` privileges to bypass Guards restrictions, therefore it requires DAO co-approval via [Co-approval Workflows](#co-approval-workflows).
+New Modules grant ychad privileges to bypass Guards restrictions, therefore it requires DAO co-approval via [Co-approval Workflows](#co-approval-workflows).
 
 ### Guard & Module Updates
 
-In exceptional circumstances, `ychad.eth` can propose the removal of the Guard via [Co-approval Workflows](#co-approval-workflows).
-Upon DAO co-approval and execution, `ychad.eth` will no longer face any restriction on administrative operations.
+In exceptional circumstances, ychad can propose the removal of the Guard via [Co-approval Workflows](#co-approval-workflows).
+Upon DAO co-approval and execution, ychad will no longer face any restriction on administrative operations.
 
-Likewise, `ychad.eth` can propose adding or removing Modules through [Co-approval Workflows](#co-approval-workflows) as well. 
+Likewise, ychad can propose adding or removing Modules through [Co-approval Workflows](#co-approval-workflows) as well. 
 For safety, it cannot remove the `SudoImplant` Module itself.
 
 ## Member Self-resignation
 
-A `ychad.eth` member can unilaterally resign by calling `EjectImplant.selfEject(false)` without approval. The Safe contract ensures threshold validity.
+A ychad member can unilaterally resign by calling `EjectImplant.selfEject(false)` without approval. The Safe contract ensures threshold validity.
 Members are prohibited from calling `EjectImplant.selfEject(true)` as it would alter the multisig threshold. Consequently, they cannot self-resign when the remaining member count equals the threshold.
 
 ## Key Parameters
 
-| ID                             | Value      | Descriptions                                            |
-|--------------------------------|------------|---------------------------------------------------------|
-| `borgIdentifier`               | Yearn BORG | BORG name                                               |
-| `borgMode`                     | blacklist  | Every operation is allowed unless blacklisted           |
-| `borgType`                     | 3          |                                                         |
-| `snapShotWaitingPeriod`        | 3 days     | Waiting period before a proposal can be executed        |
-| `snapShotCancelPeriod`         | 2 days     | Extra waiting period before a proposal can be cancelled |
-| `snapShotPendingProposalLimit` | 3          | Maximum pending proposals                               |
-| `oracle`                       | `address`  | MetaLeX Snapshot oracle                                 |
+| ID                             | Value      | Descriptions                                                                                                              |
+|--------------------------------|------------|---------------------------------------------------------------------------------------------------------------------------|
+| `borgIdentifier`               | Yearn BORG | BORG name                                                                                                                 |
+| `borgMode`                     | blacklist  | Every operation is allowed unless blacklisted                                                                             |
+| `borgType`                     | 3          | Dev BORG                                                                                                                  |
+| `snapShotWaitingPeriod`        | 3 days     | Waiting period before a proposal can be executed                                                                          |
+| `snapShotCancelPeriod`         | 2 days     | Extra waiting period before a proposal can be cancelled                                                                   |
+| `snapShotPendingProposalLimit` | 3          | Maximum pending proposals                                                                                                 |
+| `snapShotTtl`                  | 30 days    | Duration of inactivity before an oracle is deemed expired and can be replaced by ychad                                    |
+| `oracle`                       | `address`  | MetaLeX Snapshot oracle (or Yearn on-chain governance contract after [transition](#future-on-chain-governance-transition) |
 
 ## Deployment
 
@@ -170,7 +171,7 @@ Members are prohibited from calling `EjectImplant.selfEject(true)` as it would a
       data:
    0xe19a9dd9000000000000000000000000bc19387f5b8ae73fad41cd2294f928a735c60534
    ```   
-4. Ask `ychad.eth` to sign and execute the Safe TXs 
+4. Ask ychad to sign and execute the Safe TXs 
 
 ## Tests
 
