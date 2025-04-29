@@ -9,7 +9,7 @@ import {GnosisTransaction} from "../test/libraries/safe.t.sol";
 
 contract YearnBorgTest is YearnBorgAcceptanceTest {
     function setUp() public override {
-        // Assume Ethereum mainnet fork after block 22268905
+        // Assume Ethereum mainnet fork after block 22377182
 
         // Simulate changing ychad.eth threshold and adding the test owner so we can run tests
         vm.prank(address(ychadSafe));

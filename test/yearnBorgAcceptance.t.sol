@@ -58,7 +58,7 @@ contract YearnBorgAcceptanceTest is Test {
     }
 
     /// @dev BORG Core metadata should meet specs
-    function testBorgMeta() public {
+    function testBorgMeta() public view {
         assertEq(core.id(), "Yearn BORG", "Unexpected BORG ID");
         assertEq(core.borgType(), 0x3, "Unexpected BORG Core type");
         assertEq(uint8(core.borgMode()), uint8(borgCore.borgModes.blacklist), "Unexpected BORG Core mode");
@@ -106,7 +106,7 @@ contract YearnBorgAcceptanceTest is Test {
         }
     }
 
-    function testSnapShotExecutorMeta() public {
+    function testSnapShotExecutorMeta() public view {
         assertEq(snapShotExecutor.oracle(), oracle, "Unexpected oracle");
         assertEq(snapShotExecutor.waitingPeriod(), 3 days, "Unexpected waitingPeriod");
         assertEq(snapShotExecutor.cancelPeriod(), 7 days, "Unexpected cancelPeriod");
@@ -114,7 +114,7 @@ contract YearnBorgAcceptanceTest is Test {
         assertEq(snapShotExecutor.oracleTtl(), 30 days, "Unexpected ORACLE_TTL");
     }
 
-    function testEjectImplantMeta() public {
+    function testEjectImplantMeta() public view {
         assertEq(eject.failSafeSignerThreshold(), 0, "Unexpected failSafeSignerThreshold");
         assertTrue(eject.ALLOW_AUTH_MANAGEMENT(), "Auth management should be allowed");
         assertTrue(eject.ALLOW_AUTH_EJECT(), "Auth ejection should be allowed");

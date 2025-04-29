@@ -22,7 +22,7 @@ contract PlaceholderFailSafeImplant {
 
     error PlaceholderFailSafeImplant_UnexpectedTrigger();
 
-    function recoverSafeFunds() external {
+    function recoverSafeFunds() external pure {
         revert PlaceholderFailSafeImplant_UnexpectedTrigger();
     }
 }

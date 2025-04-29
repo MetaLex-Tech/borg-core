@@ -23,7 +23,7 @@ contract SafeTxHelper is CommonBase {
         signer = vm.addr(signerPrivateKey);
     }
 
-    function createTestBatch(address core) public returns (GnosisTransaction[] memory) {
+    function createTestBatch(address core) public view returns (GnosisTransaction[] memory) {
         GnosisTransaction[] memory batch = new GnosisTransaction[](2);
         address guyToApprove = address(0xdeadbabe);
         address token = 0xF17A3fE536F8F7847F1385ec1bC967b2Ca9caE8D;
@@ -97,13 +97,13 @@ contract SafeTxHelper is CommonBase {
         return GnosisTransaction({to: address(safe), value: 0, data: cdata});
     }
 
-    function getNativeTransferData(address to, uint256 amount) public view returns (GnosisTransaction memory) {
+    function getNativeTransferData(address to, uint256 amount) public pure returns (GnosisTransaction memory) {
         // Send the value with no data
         GnosisTransaction memory txData = GnosisTransaction({to: to, value: amount, data: ""});
         return txData;
     }
 
-    function getTransferData(address token, address to, uint256 amount) public view returns (GnosisTransaction memory) {
+    function getTransferData(address token, address to, uint256 amount) public pure returns (GnosisTransaction memory) {
         bytes4 transferFunctionSignature = bytes4(
             keccak256("transfer(address,uint256)")
         );
@@ -117,7 +117,7 @@ contract SafeTxHelper is CommonBase {
         return txData;
     }
 
-    function getApproveData(address token, address spender, uint256 amount) public view returns (GnosisTransaction memory) {
+    function getApproveData(address token, address spender, uint256 amount) public pure returns (GnosisTransaction memory) {
         bytes4 approveFunctionSignature = bytes4(
             keccak256("approve(address,uint256)")
         );
@@ -131,7 +131,7 @@ contract SafeTxHelper is CommonBase {
         return txData;
     }
 
-    function getAddContractGuardData(address to, address allow, uint256 amount) public view returns (GnosisTransaction memory) {
+    function getAddContractGuardData(address to, address allow, uint256 amount) public pure returns (GnosisTransaction memory) {
         bytes4 funcSig = bytes4(
             keccak256("addContract(address,uint256)")
         );
@@ -200,7 +200,7 @@ contract SafeTxHelper is CommonBase {
         return GnosisTransaction({to: address(safe), value: 0, data: cdata});
     }
 
-    function getAddRecipientGuardData(address to, address _contract, uint256 amount) public view returns (GnosisTransaction memory) {
+    function getAddRecipientGuardData(address to, address _contract, uint256 amount) public pure returns (GnosisTransaction memory) {
         bytes4 addRecipientMethod = bytes4(
             keccak256("addRecipient(address,uint256)")
         );
@@ -214,7 +214,7 @@ contract SafeTxHelper is CommonBase {
         return txData;
     }
 
-    function getRemoveRecepientGuardData(address to, address _contract) public view returns (GnosisTransaction memory) {
+    function getRemoveRecepientGuardData(address to, address _contract) public pure returns (GnosisTransaction memory) {
         bytes4 removeRecepientMethod = bytes4(
             keccak256("removeRecepient(address)")
         );
@@ -227,7 +227,7 @@ contract SafeTxHelper is CommonBase {
         return txData;
     }
 
-    function getRemoveContractGuardData(address to, address _contract) public view returns (GnosisTransaction memory) {
+    function getRemoveContractGuardData(address to, address _contract) public pure returns (GnosisTransaction memory) {
         bytes4 removeContractMethod = bytes4(
             keccak256("removeContract(address)")
         );
@@ -240,7 +240,7 @@ contract SafeTxHelper is CommonBase {
         return txData;
     }
 
-    function getRemovePolicyMethodGuardData(address to, address _contract, string memory methodSignature) public view returns (GnosisTransaction memory) {
+    function getRemovePolicyMethodGuardData(address to, address _contract, string memory methodSignature) public pure returns (GnosisTransaction memory) {
         bytes memory cdata = abi.encodeWithSelector(
             borgCore.removePolicyMethod.selector,
             _contract,
@@ -249,7 +249,7 @@ contract SafeTxHelper is CommonBase {
         return GnosisTransaction({to: to, value: 0, data: cdata});
     }
 
-    function getRemoveParameterConstraintGuardData(address to, address _contract, string memory methodSignature, uint256 byteOffset) public view returns (GnosisTransaction memory) {
+    function getRemoveParameterConstraintGuardData(address to, address _contract, string memory methodSignature, uint256 byteOffset) public pure returns (GnosisTransaction memory) {
         bytes memory cdata = abi.encodeWithSelector(
             borgCore.removeParameterConstraint.selector,
             _contract,
@@ -259,7 +259,7 @@ contract SafeTxHelper is CommonBase {
         return GnosisTransaction({to: to, value: 0, data: cdata});
     }
 
-    function getCreateGrantData(address opGrant, address token, address rec, uint256 amount) public view returns (GnosisTransaction memory) {
+    function getCreateGrantData(address opGrant, address token, address rec, uint256 amount) public pure returns (GnosisTransaction memory) {
         bytes4 funcSig = bytes4(
             keccak256("createDirectGrant(address,address,uint256)")
         );
@@ -275,9 +275,7 @@ contract SafeTxHelper is CommonBase {
     }
 
     function getCreateBasicGrantData(address opGrant, address token, address rec, uint256 amount) public view returns (GnosisTransaction memory) {
-        //Configure the metavest details
-        uint256 _unlocked = amount/2;
-        uint256 _vested = amount/2;
+        // Configure the metavest details
         BaseAllocation.Milestone[] memory emptyMilestones;
         BaseAllocation.Allocation memory _metavestDetails = BaseAllocation.Allocation({
             tokenStreamTotal: amount,
@@ -307,13 +305,13 @@ contract SafeTxHelper is CommonBase {
         return txData;
     }
 
-    function getGuard(address safe) external view returns (address guard) {
+    function getGuard(address _safe) external view returns (address guard) {
         // Workaround since getGuard() is not public:
         // https://github.com/safe-global/safe-smart-account/blob/c4859f4182be9d3fad0e5b5853c26a013c8b43a2/contracts/base/GuardManager.sol#L83-L97
 
         // keccak256("guard_manager.guard.address")
         bytes32 GUARD_STORAGE_SLOT = 0x4a204f620c8c5ccdca3fd54d003badd85ba500436a431f0cbda4f558c93c34c8;
-        return address(uint160(uint256(vm.load(safe, GUARD_STORAGE_SLOT))));
+        return address(uint160(uint256(vm.load(_safe, GUARD_STORAGE_SLOT))));
     }
 
     function getSignature(
@@ -374,12 +372,12 @@ contract SafeTxHelper is CommonBase {
         executeData(address(multiSendCallOnly), 1, data, 0, "");
     }
 
-    function executeSingle(GnosisTransaction memory tx) public {
-        executeData(tx.to, 0, tx.data, tx.value, "");
+    function executeSingle(GnosisTransaction memory _tx) public {
+        executeData(_tx.to, 0, _tx.data, _tx.value, "");
     }
 
-    function executeSingle(GnosisTransaction memory tx, bytes memory expectRevertData) public {
-        executeData(tx.to, 0, tx.data, tx.value, expectRevertData);
+    function executeSingle(GnosisTransaction memory _tx, bytes memory expectRevertData) public {
+        executeData(_tx.to, 0, _tx.data, _tx.value, expectRevertData);
     }
 
     function executeData(
