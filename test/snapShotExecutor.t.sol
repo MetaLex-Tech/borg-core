@@ -16,12 +16,16 @@ contract SnapShotExecutorTest is Test {
     address newOracle = vm.addr(3);
     address alice = vm.addr(4);
 
+    uint256 oracleTtl = 30 days;
+    uint256 newOracleTtl = 60 days;
+
     BorgAuth auth;
     SnapShotExecutor snapShotExecutor;
 
     event ProposalCreated(bytes32 indexed proposalId, address indexed target, uint256 value, bytes cdata, string description, uint256 timestamp);
     event ProposalExecuted(bytes32 indexed proposalId, address indexed target, uint256 value, bytes cdata, string description, uint256 timestamp, bool success);
     event ProposalCanceled(bytes32 indexed proposalId, address indexed target, uint256 value, bytes cdata, string description, uint256 timestamp);
+    event OracleTransferred(address newOracle, uint256 newOracleTtl);
 
     function setUp() public virtual {
         auth = new BorgAuth();
@@ -31,7 +35,7 @@ contract SnapShotExecutorTest is Test {
             3 days, // waitingPeriod
             2 days, // cancelPeriod
             3, // pendingProposalLimit
-            30 days // ttl
+            oracleTtl
         );
 
         // Transferring auth ownership
@@ -47,7 +51,7 @@ contract SnapShotExecutorTest is Test {
         assertEq(snapShotExecutor.cancelPeriod(), 2 days, "Unexpected cancelPeriod");
         assertEq(snapShotExecutor.pendingProposalCount(), 0, "Unexpected pendingProposalCount");
         assertEq(snapShotExecutor.pendingProposalLimit(), 3, "Unexpected pendingProposalLimit");
-        assertEq(snapShotExecutor.ORACLE_TTL(), 30 days, "Unexpected ORACLE_TTL");
+        assertEq(snapShotExecutor.oracleTtl(), 30 days, "Unexpected ORACLE_TTL");
         assertEq(snapShotExecutor.lastOraclePingTimestamp(), block.timestamp, "Unexpected lastOraclePingTimestamp");
     }
 
@@ -244,7 +248,8 @@ contract SnapShotExecutorTest is Test {
             0 ether, // value
             abi.encodeWithSelector(
                 snapShotExecutor.transferOracle.selector,
-                address(newOracle)
+                address(newOracle),
+                newOracleTtl
             ), // cdata
             "Transfer oracle"
         );
@@ -256,16 +261,21 @@ contract SnapShotExecutorTest is Test {
         vm.prank(oracle);
         snapShotExecutor.ping();
         assertEq(snapShotExecutor.oracle(), oracle);
+        assertEq(snapShotExecutor.oracleTtl(), oracleTtl);
 
         // Non-oracle should still be unauthorized
         vm.expectRevert(abi.encodeWithSelector(SnapShotExecutor.SnapShotExecutor_NotAuthorized.selector));
         snapShotExecutor.ping();
 
         // Transfer should be done after the new oracle interacts
+        vm.expectEmit();
+        emit OracleTransferred(newOracle, newOracleTtl);
         vm.prank(newOracle);
         snapShotExecutor.ping();
         assertEq(snapShotExecutor.oracle(), newOracle);
+        assertEq(snapShotExecutor.oracleTtl(), newOracleTtl);
         assertEq(snapShotExecutor.pendingOracle(), address(0));
+        assertEq(snapShotExecutor.pendingOracleTtl(), 0);
         // Old oracle should no longer be authorized
         vm.expectRevert(abi.encodeWithSelector(SnapShotExecutor.SnapShotExecutor_NotAuthorized.selector));
         vm.prank(oracle);
@@ -275,30 +285,35 @@ contract SnapShotExecutorTest is Test {
     /// @dev Should not be able to transfer oracle if not through a proposal
     function test_RevertIf_TransferOracleNotSelf() public {
         vm.expectRevert(abi.encodeWithSelector(SnapShotExecutor.SnapShotExecutor_NotAuthorized.selector));
-        snapShotExecutor.transferOracle(newOracle);
+        snapShotExecutor.transferOracle(newOracle, newOracleTtl);
     }
 
     /// @dev Owner should be able to replace dead oracle
     function testTransferExpiredOracle() public {
         // Let the old oracle expire, then transfer it
-        skip(snapShotExecutor.ORACLE_TTL());
+        skip(snapShotExecutor.oracleTtl());
         vm.prank(owner);
-        snapShotExecutor.transferExpiredOracle(newOracle);
+        snapShotExecutor.transferExpiredOracle(newOracle, newOracleTtl);
 
         // Old oracle should still work when the transfer is pending
         vm.prank(oracle);
         snapShotExecutor.ping();
         assertEq(snapShotExecutor.oracle(), oracle);
+        assertEq(snapShotExecutor.oracleTtl(), oracleTtl);
 
         // Non-oracle should still be unauthorized
         vm.expectRevert(abi.encodeWithSelector(SnapShotExecutor.SnapShotExecutor_NotAuthorized.selector));
         snapShotExecutor.ping();
 
         // Transfer should be done after the new oracle interacts
+        vm.expectEmit();
+        emit OracleTransferred(newOracle, newOracleTtl);
         vm.prank(newOracle);
         snapShotExecutor.ping();
         assertEq(snapShotExecutor.oracle(), newOracle);
+        assertEq(snapShotExecutor.oracleTtl(), newOracleTtl);
         assertEq(snapShotExecutor.pendingOracle(), address(0));
+        assertEq(snapShotExecutor.pendingOracleTtl(), 0);
         // Old oracle should no longer be authorized
         vm.expectRevert(abi.encodeWithSelector(SnapShotExecutor.SnapShotExecutor_NotAuthorized.selector));
         vm.prank(oracle);
@@ -309,6 +324,6 @@ contract SnapShotExecutorTest is Test {
     function test_RevertIf_TransferExpiredOracleNotDead() public {
         vm.expectRevert(abi.encodeWithSelector(SnapShotExecutor.SnapShotExecutor_OracleNotDead.selector));
         vm.prank(owner);
-        snapShotExecutor.transferExpiredOracle(newOracle);
+        snapShotExecutor.transferExpiredOracle(newOracle, newOracleTtl);
     }
 }

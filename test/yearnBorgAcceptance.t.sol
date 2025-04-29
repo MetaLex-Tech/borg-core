@@ -111,7 +111,7 @@ contract YearnBorgAcceptanceTest is Test {
         assertEq(snapShotExecutor.waitingPeriod(), 3 days, "Unexpected waitingPeriod");
         assertEq(snapShotExecutor.cancelPeriod(), 2 days, "Unexpected cancelPeriod");
         assertEq(snapShotExecutor.pendingProposalLimit(), 3, "Unexpected pendingProposalLimit");
-        assertEq(snapShotExecutor.ORACLE_TTL(), 30 days, "Unexpected ORACLE_TTL");
+        assertEq(snapShotExecutor.oracleTtl(), 30 days, "Unexpected ORACLE_TTL");
     }
 
     function testEjectImplantMeta() public {
@@ -283,7 +283,8 @@ contract YearnBorgAcceptanceTest is Test {
                 0, // value
                 abi.encodeWithSelector(
                     snapShotExecutor.transferOracle.selector,
-                    address(yearnGovExecutor)
+                    address(yearnGovExecutor),
+                    1095 days // 3 years
                 ), // cdata
                 "Set yearnGovExecutor as new oracle"
             );
@@ -303,6 +304,7 @@ contract YearnBorgAcceptanceTest is Test {
 
             // YearnGovExecutor should be a pending oracle now, and it will assume the oracle role the next time it interacts with snapShotExecutor
             assertEq(snapShotExecutor.pendingOracle(), address(yearnGovExecutor), "yearnGovExecutor should be pending as new oracle");
+            assertEq(snapShotExecutor.pendingOracleTtl(), 1095 days, "Unexpected pending oracle TTL");
         }
 
         // Simulate adding member through on-chain governance
@@ -402,7 +404,7 @@ contract YearnBorgAcceptanceTest is Test {
     /// @dev Safe should be able to replace a dead oracle
     function testTransferExpiredOracle() public {
         // Let the old oracle expire, then transfer it
-        skip(snapShotExecutor.ORACLE_TTL());
+        skip(snapShotExecutor.oracleTtl());
 
         // Safe should be able to replace the dead oracle unilaterally
         safeTxHelper.executeSingle(GnosisTransaction({
@@ -410,9 +412,11 @@ contract YearnBorgAcceptanceTest is Test {
             value: 0,
             data: abi.encodeWithSelector(
                 snapShotExecutor.transferExpiredOracle.selector,
-                address(1) // new oracle
+                address(1), // new oracle
+                1 days // new oracle TTL
             )
         }));
         assertEq(snapShotExecutor.pendingOracle(), address(1), "New oracle should be pending now");
+        assertEq(snapShotExecutor.pendingOracleTtl(), 1 days, "New oracle TTL should be pending now");
     }
 }
