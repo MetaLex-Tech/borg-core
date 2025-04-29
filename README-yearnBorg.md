@@ -127,16 +127,16 @@ Members are prohibited from calling `EjectImplant.selfEject(true)` as it would a
 
 ## Key Parameters
 
-| ID                             | Value      | Descriptions                                                                                                              |
-|--------------------------------|------------|---------------------------------------------------------------------------------------------------------------------------|
-| `borgIdentifier`               | Yearn BORG | BORG name                                                                                                                 |
-| `borgMode`                     | blacklist  | Every operation is allowed unless blacklisted                                                                             |
-| `borgType`                     | 3          | Dev BORG                                                                                                                  |
-| `snapShotWaitingPeriod`        | 3 days     | Waiting period before a proposal can be executed                                                                          |
-| `snapShotCancelPeriod`         | 2 days     | Extra waiting period before a proposal can be cancelled                                                                   |
-| `snapShotPendingProposalLimit` | 3          | Maximum pending proposals                                                                                                 |
-| `snapShotTtl`                  | 30 days    | Duration of inactivity before an oracle is deemed expired and can be replaced by ychad                                    |
-| `oracle`                       | `address`  | MetaLeX Snapshot oracle (or Yearn on-chain governance contract after [transition](#future-on-chain-governance-transition) |
+| ID                             | Value      | Descriptions                                                                                                               |
+|--------------------------------|------------|----------------------------------------------------------------------------------------------------------------------------|
+| `borgIdentifier`               | Yearn BORG | BORG name                                                                                                                  |
+| `borgMode`                     | blacklist  | Every operation is allowed unless blacklisted                                                                              |
+| `borgType`                     | 3          | Dev BORG                                                                                                                   |
+| `snapShotWaitingPeriod`        | 3 days     | Waiting period before a proposal can be executed                                                                           |
+| `snapShotCancelPeriod`         | 7 days     | Extra waiting period before a proposal can be cancelled                                                                    |
+| `snapShotPendingProposalLimit` | 3          | Maximum pending proposals                                                                                                  |
+| `snapShotTtl`                  | 30 days    | Duration of inactivity before an oracle is deemed expired and can be replaced by ychad                                     |
+| `oracle`                       | `address`  | MetaLeX Snapshot oracle (or Yearn on-chain governance contract after [transition](#future-on-chain-governance-transition)) |
 
 ## Deployment
 
