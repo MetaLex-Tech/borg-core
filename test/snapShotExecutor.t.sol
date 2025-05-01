@@ -33,7 +33,7 @@ contract SnapShotExecutorTest is Test {
             auth,
             oracle,
             3 days, // waitingPeriod
-            2 days, // cancelPeriod
+            7 days, // cancelPeriod
             3, // pendingProposalLimit
             oracleTtl
         );
@@ -48,7 +48,7 @@ contract SnapShotExecutorTest is Test {
         assertEq(snapShotExecutor.oracle(), oracle, "Unexpected oracle address");
         assertEq(snapShotExecutor.pendingOracle(), address(0), "Unexpected pending oracle address");
         assertEq(snapShotExecutor.waitingPeriod(), 3 days, "Unexpected waitingPeriod");
-        assertEq(snapShotExecutor.cancelPeriod(), 2 days, "Unexpected cancelPeriod");
+        assertEq(snapShotExecutor.proposalExpirySeconds(), 7 days, "Unexpected cancelPeriod");
         assertEq(snapShotExecutor.pendingProposalCount(), 0, "Unexpected pendingProposalCount");
         assertEq(snapShotExecutor.pendingProposalLimit(), 3, "Unexpected pendingProposalLimit");
         assertEq(snapShotExecutor.oracleTtl(), 30 days, "Unexpected ORACLE_TTL");
@@ -149,7 +149,7 @@ contract SnapShotExecutorTest is Test {
 
         // cancel() should fail within waiting period
 
-        vm.expectRevert(abi.encodeWithSelector(SnapShotExecutor.SnapShotExecutor_WaitingPeriod.selector));
+        vm.expectRevert(abi.encodeWithSelector(SnapShotExecutor.SnapShotExecutor_NotExpired.selector));
         snapShotExecutor.cancel(proposalId);
 
         // After waiting period
@@ -157,11 +157,11 @@ contract SnapShotExecutorTest is Test {
 
         // cancel() should fail within cancel period
 
-        vm.expectRevert(abi.encodeWithSelector(SnapShotExecutor.SnapShotExecutor_WaitingPeriod.selector));
+        vm.expectRevert(abi.encodeWithSelector(SnapShotExecutor.SnapShotExecutor_NotExpired.selector));
         snapShotExecutor.cancel(proposalId);
 
         // After cancel period
-        skip(snapShotExecutor.cancelPeriod());
+        skip(snapShotExecutor.proposalExpirySeconds());
 
         // cancel() should succeed now
 

@@ -11,7 +11,7 @@ contract SnapShotExecutor is BorgAuthACL {
     address public pendingOracle;
     uint256 public pendingOracleTtl;
     uint256 public waitingPeriod;
-    uint256 public cancelPeriod;
+    uint256 public proposalExpirySeconds;
     uint256 public pendingProposalCount;
     uint256 public pendingProposalLimit;
     uint256 public lastOraclePingTimestamp;
@@ -21,20 +21,21 @@ contract SnapShotExecutor is BorgAuthACL {
         uint256 value;
         bytes cdata;
         string description;
-        uint256 timestamp;
+        uint256 executableAfter;
     }
 
     error SnapShotExecutor_NotAuthorized();
     error SnapShotExecutor_InvalidProposal();
     error SnapShotExecutor_WaitingPeriod();
+    error SnapShotExecutor_NotExpired();
     error SnapShotExeuctor_InvalidParams();
     error SnapShotExecutor_TooManyPendingProposals();
     error SnapShotExecutor_OracleNotDead();
 
     //events
-    event ProposalCreated(bytes32 indexed proposalId, address indexed target, uint256 value, bytes cdata, string description, uint256 timestamp);
-    event ProposalExecuted(bytes32 indexed proposalId, address indexed target, uint256 value, bytes cdata, string description, uint256 timestamp, bool success);
-    event ProposalCanceled(bytes32 indexed proposalId, address indexed target, uint256 value, bytes cdata, string description, uint256 timestamp);
+    event ProposalCreated(bytes32 indexed proposalId, address indexed target, uint256 value, bytes cdata, string description, uint256 executableAfter);
+    event ProposalExecuted(bytes32 indexed proposalId, address indexed target, uint256 value, bytes cdata, string description, uint256 executableAfter, bool success);
+    event ProposalCanceled(bytes32 indexed proposalId, address indexed target, uint256 value, bytes cdata, string description, uint256 executableAfter);
     event OracleTransferred(address newOracle, uint256 newOracleTtl);
 
     mapping(bytes32 => proposal) public pendingProposals;
@@ -61,12 +62,12 @@ contract SnapShotExecutor is BorgAuthACL {
         _;
     }
 
-    constructor(BorgAuth _auth, address _oracle, uint256 _waitingPeriod, uint256 _cancelPeriod, uint256 _pendingProposals, uint256 _oracleTtl) BorgAuthACL(_auth) {
+    constructor(BorgAuth _auth, address _oracle, uint256 _waitingPeriod, uint256 _proposalExpirySeconds, uint256 _pendingProposals, uint256 _oracleTtl) BorgAuthACL(_auth) {
         oracle = _oracle;
         if(_waitingPeriod < 1 minutes) revert SnapShotExeuctor_InvalidParams();
         waitingPeriod = _waitingPeriod;
-        if(_cancelPeriod < 1 minutes) revert SnapShotExeuctor_InvalidParams();
-        cancelPeriod = _cancelPeriod;
+        if(_proposalExpirySeconds < 1 minutes) revert SnapShotExeuctor_InvalidParams();
+        proposalExpirySeconds = _proposalExpirySeconds;
         pendingProposalLimit = _pendingProposals;
         oracleTtl = _oracleTtl;
         lastOraclePingTimestamp = block.timestamp;
@@ -83,21 +84,21 @@ contract SnapShotExecutor is BorgAuthACL {
 
     function execute(bytes32 proposalId) payable external onlyOwner() {
         proposal memory p = pendingProposals[proposalId];
-        if (p.timestamp > block.timestamp) revert SnapShotExecutor_WaitingPeriod();
+        if (p.executableAfter > block.timestamp) revert SnapShotExecutor_WaitingPeriod();
         if(p.target == address(0)) revert SnapShotExecutor_InvalidProposal();
         (bool success, ) = p.target.call{value: p.value}(p.cdata);
-        emit ProposalExecuted(proposalId, p.target, p.value, p.cdata, p.description, p.timestamp, success);
+        emit ProposalExecuted(proposalId, p.target, p.value, p.cdata, p.description, p.executableAfter, success);
         pendingProposalCount--;
         delete pendingProposals[proposalId];
     }
 
     function cancel(bytes32 proposalId) external {
         proposal memory p = pendingProposals[proposalId];
-        if (p.timestamp + cancelPeriod > block.timestamp) revert SnapShotExecutor_WaitingPeriod();
+        if (p.executableAfter + proposalExpirySeconds > block.timestamp) revert SnapShotExecutor_NotExpired();
         if(p.target == address(0)) revert SnapShotExecutor_InvalidProposal();
         pendingProposalCount--;
         delete pendingProposals[proposalId];
-        emit ProposalCanceled(proposalId, p.target, p.value, p.cdata, p.description, p.timestamp);
+        emit ProposalCanceled(proposalId, p.target, p.value, p.cdata, p.description, p.executableAfter);
     }
 
     /// @dev Allow transferring oracle through a proposal. It must be called by `SnapShotExecutor` itself and the only way to do it is through propose()+execute().
