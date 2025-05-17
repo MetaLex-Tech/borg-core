@@ -44,7 +44,7 @@ contract YearnBorgDeployScript is Script {
     uint256 snapShotWaitingPeriod = 3 days; // TODO Is it still necessary?
     uint256 snapShotCancelPeriod = 7 days;
     uint256 snapShotPendingProposalLimit = 3;
-    uint256 snapShotTtl = 30 days;
+    uint256 snapShotOracleTtl = 30 days;
     address oracle = 0xf00c0dE09574805389743391ada2A0259D6b7a00;
     
     SafeTxHelper safeTxHelper;
@@ -109,7 +109,7 @@ contract YearnBorgDeployScript is Script {
         // Create SnapShotExecutor
 
         executorAuth = new BorgAuth();
-        snapShotExecutor = new SnapShotExecutor(executorAuth, address(oracle), snapShotWaitingPeriod, snapShotCancelPeriod, snapShotPendingProposalLimit, snapShotTtl);
+        snapShotExecutor = new SnapShotExecutor(executorAuth, address(oracle), snapShotWaitingPeriod, snapShotCancelPeriod, snapShotPendingProposalLimit, snapShotOracleTtl);
 
         // Add modules
 
