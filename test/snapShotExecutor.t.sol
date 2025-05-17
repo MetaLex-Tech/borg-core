@@ -123,6 +123,42 @@ contract SnapShotExecutorTest is Test {
         }
     }
 
+    /// @dev Should not be able to propose duplicates and mess up with the proposal count
+    function test_RevertIf_ProposalAlreadyExists() public {
+        // First proposal should work
+        vm.prank(oracle);
+        bytes32 proposalId1 = snapShotExecutor.propose(
+            address(alice), // target
+            0, // value
+            "", // cdata
+            "Arbitrary instruction"
+        );
+
+        // Duplicate proposal should fail
+        vm.expectRevert(abi.encodeWithSelector(SnapShotExecutor.SnapShotExecutor_ProposalAlreadyExists.selector));
+        vm.prank(oracle);
+        snapShotExecutor.propose(
+            address(alice), // target
+            0, // value
+            "", // cdata
+            "Arbitrary instruction"
+        );
+
+        // Change the description should work
+        vm.prank(oracle);
+        bytes32 proposalId2 = snapShotExecutor.propose(
+            address(alice), // target
+            0, // value
+            "", // cdata
+            "Different descriptions"
+        );
+        assertEq(snapShotExecutor.pendingProposalCount(), 2, "Expect 2 pending proposal");
+        (,,, string memory description1, ) = snapShotExecutor.pendingProposals(proposalId1);
+        assertEq(description1, "Arbitrary instruction", "Expect proposal1's description");
+        (,,, string memory description2, ) = snapShotExecutor.pendingProposals(proposalId2);
+        assertEq(description2, "Different descriptions", "Expect proposal2's description");
+    }
+
     /// @dev Non-oracle should not be able to propose
     function test_RevertIf_NotOracleProposal() public {
         vm.expectRevert(abi.encodeWithSelector(SnapShotExecutor.SnapShotExecutor_NotAuthorized.selector));
@@ -185,19 +221,19 @@ contract SnapShotExecutorTest is Test {
             address(alice), // target
             0, // value
             "", // cdata
-            "Arbitrary instruction"
+            "Arbitrary instruction 1"
         );
         snapShotExecutor.propose(
             address(alice), // target
             0, // value
             "", // cdata
-            "Arbitrary instruction"
+            "Arbitrary instruction 2"
         );
         snapShotExecutor.propose(
             address(alice), // target
             0, // value
             "", // cdata
-            "Arbitrary instruction"
+            "Arbitrary instruction 3"
         );
 
         // Should failed due to the limit
@@ -207,7 +243,7 @@ contract SnapShotExecutorTest is Test {
             address(alice), // target
             0, // value
             "", // cdata
-            "Arbitrary instruction"
+            "Arbitrary instruction 4"
         );
 
         vm.stopPrank();

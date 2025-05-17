@@ -26,6 +26,7 @@ contract SnapShotExecutor is BorgAuthACL {
 
     error SnapShotExecutor_NotAuthorized();
     error SnapShotExecutor_InvalidProposal();
+    error SnapShotExecutor_ProposalAlreadyExists();
     error SnapShotExecutor_WaitingPeriod();
     error SnapShotExecutor_NotExpired();
     error SnapShotExeuctor_InvalidParams();
@@ -76,6 +77,8 @@ contract SnapShotExecutor is BorgAuthACL {
     function propose(address target, uint256 value, bytes calldata cdata, string memory description) external onlyOracle() returns (bytes32) {
         if(pendingProposalCount >= pendingProposalLimit) revert SnapShotExecutor_TooManyPendingProposals();
         bytes32 proposalId = keccak256(abi.encodePacked(target, value, cdata, description));
+        // Make sure the new proposal does not duplicate a previous one, otherwise we wouldn't be able to cancel both
+        if (pendingProposals[proposalId].target != address(0)) revert SnapShotExecutor_ProposalAlreadyExists();
         pendingProposals[proposalId] = proposal(target, value, cdata, description, block.timestamp + waitingPeriod);
         pendingProposalCount++;
         emit ProposalCreated(proposalId, target, value, cdata, description, block.timestamp + waitingPeriod);
