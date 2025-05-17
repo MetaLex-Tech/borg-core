@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity 0.8.20;
 
-import "./BaseCondition.sol";
+import "./baseCondition.sol";
 
 /// @title  TimeCondition - A condition that checks if the current time is before or after a target time
 /// @author MetaLeX Labs, Inc.

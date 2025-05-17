@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity 0.8.20;
 
-import "./BaseCondition.sol";
+import "./baseCondition.sol";
 
 // Chainlink AggregatorV3Interface
 interface AggregatorV3Interface {
