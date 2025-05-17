@@ -143,9 +143,10 @@ contract SignatureHelper {
     /// @dev Returns the nonce of the Safe
     /// @param safe Address of the Safe
     function getNonce(address safe) public view returns (uint256) {
-        (bool success, bytes memory result) = safe.staticcall(abi.encodeWithSignature("nonce()"));
+        (bool success, bytes memory result) =
+            safe.staticcall(abi.encodeWithSignature("nonce()"));
         require(success, "Failed to get nonce");
-        return abi.decode(result, (uint256))-1;
+        return abi.decode(result, (uint256));
     }
 
     /// @dev Returns the threshold of the Safe
