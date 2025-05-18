@@ -50,7 +50,7 @@ contract BlackListTest is Test {
     mockPerm = new MockPerm();
 
     failSafe = new failSafeImplant(auth, address(safe), dao);
-    eject = new ejectImplant(auth, MULTISIG, address(failSafe), false, true);
+    eject = new ejectImplant(auth, MULTISIG, address(failSafe), false, true, true);
 
     deal(owner, 2 ether);
     deal(MULTISIG, 2 ether);

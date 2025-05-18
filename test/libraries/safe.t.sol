@@ -9,7 +9,11 @@ interface IGnosisSafe {
 
     function getOwners() external view returns (address[] memory);
 
+    function isModuleEnabled(address module) external view returns (bool);
+
     function setGuard(address guard) external;
+
+    function addOwnerWithThreshold(address owner, uint256 threshold) external;
 
     function execTransaction(
         address to,

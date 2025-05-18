@@ -49,7 +49,7 @@ contract EjectTest is Test {
     core = new borgCore(auth, 0x1, borgCore.borgModes.whitelist, "eject-testing", address(safe));
     
     failSafe = new failSafeImplant(auth, address(safe), dao);
-    eject = new ejectImplant(auth, MULTISIG, address(failSafe), true, true);
+    eject = new ejectImplant(auth, MULTISIG, address(failSafe), true, true, true);
     vm.prank(dao);
     auth.updateRole(address(eject), 99);
 
