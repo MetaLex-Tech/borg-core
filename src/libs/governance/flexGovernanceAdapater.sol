@@ -11,15 +11,15 @@ contract FlexGovernanceAdapter is BaseGovernanceAdapter {
     /// @notice Address of the governor contract
     address public governorContract;
 
-    /// @param _goverernorContract Address of the governor contract
-     constructor(BorgAuth _auth, address _goverernorContract) BorgAuthACL(_auth) {
-        governorContract = _goverernorContract;
+    /// @param _governorContract Address of the governor contract
+     constructor(BorgAuth _auth, address _governorContract) BorgAuthACL(_auth) {
+        governorContract = _governorContract;
      }
 
     /// @notice Update the governor contract address
-    /// @param _goverernorContract Address of the governor contract
-    function updateGovernorContract(address _goverernorContract) public onlyOwner() {
-        governorContract = _goverernorContract;
+    /// @param _governorContract Address of the governor contract
+    function updateGovernorContract(address _governorContract) public onlyOwner() {
+        governorContract = _governorContract;
     }
 
     /// @notice Create a proposal in the governor contract with quorum, threshold and duration
