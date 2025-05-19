@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity 0.8.20;
 
-import "./BaseCondition.sol";
+import "./baseCondition.sol";
 
 /// @dev    Conforms to API3's dAPI and Airnode specs; see docs.api3.org, https://docs.api3.org/guides/dapis/read-a-dapi/;
 /// @author MetaLeX Labs, Inc.

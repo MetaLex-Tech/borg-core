@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity 0.8.20;
 
-import "./BaseCondition.sol";
+import "./baseCondition.sol";
 
 /// @title  DeadManSwitchCondition - A condition that checks if a specified delay time has passed and the Gnosis Safe nonce is unchanged
 /// @author MetaLeX Labs, Inc.
