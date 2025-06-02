@@ -127,7 +127,8 @@ contract YearnBorgDeployScript is Script {
             address(ychadSafe)
         );
 
-        // Burn core ownership
+        // Transfer core ownership to SnapShotExecutor
+        coreAuth.updateRole(address(snapShotExecutor), implantAuth.OWNER_ROLE());
         coreAuth.zeroOwner();
 
         // Transfer executor ownership to ychad.eth

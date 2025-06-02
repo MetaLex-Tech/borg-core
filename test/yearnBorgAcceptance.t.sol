@@ -78,6 +78,7 @@ contract YearnBorgAcceptanceTest is Test {
         // Verify core auth roles
         {
             uint256 ownerRole = coreAuth.OWNER_ROLE();
+            coreAuth.onlyRole(ownerRole, address(snapShotExecutor));
             // Verify not owners
             vm.expectRevert(abi.encodeWithSelector(BorgAuth.BorgAuth_NotAuthorized.selector, ownerRole, address(ychadSafe)));
             coreAuth.onlyRole(ownerRole, address(ychadSafe));
