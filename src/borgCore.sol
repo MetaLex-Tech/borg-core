@@ -196,13 +196,18 @@ contract borgCore is BaseGuard, BorgAuthACL, IEIP4824 {
                 lastNativeExecutionTimestamp = block.timestamp;
             } 
 
+            // Block all delegate calls by default in blacklist mode
+            if(operation == Enum.Operation.DelegateCall) {
+                // Only allow if contract is explicitly whitelisted for delegate calls
+                if(!policy[to].enabled || !policy[to].delegateCallAllowed) {
+                    revert BORG_CORE_DelegateCallNotAuthorized();
+                }
+            }
+
             //black list contract calls w/ data
              if (data.length > 0) {
                 if(policy[to].enabled) {
                     if(policy[to].fullAccessOrBlock) revert BORG_CORE_InvalidContract();
-                    if(!policy[to].delegateCallAllowed && operation == Enum.Operation.DelegateCall) {
-                        revert BORG_CORE_DelegateCallNotAuthorized();
-                    }
 
                     if(!isMethodCallAllowed(to, data))
                             revert BORG_CORE_MethodNotAuthorized();
