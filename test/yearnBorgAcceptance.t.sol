@@ -420,4 +420,59 @@ contract YearnBorgAcceptanceTest is Test {
         assertEq(snapShotExecutor.pendingOracle(), address(1), "New oracle should be pending now");
         assertEq(snapShotExecutor.pendingOracleTtl(), 1 days, "New oracle TTL should be pending now");
     }
+
+    /// @dev BORG policy management should succeed given DAO and ychad.eth's co-approval
+    function testBorgPolicyManagement() public {
+        {
+            (bool approved,) = core.policyRecipients(alice);
+            vm.assertFalse(approved, "Alice should not be a recipient before proposal");
+        }
+
+        // Propose to change BORG policies
+        vm.prank(oracle);
+        bytes32 proposalId = snapShotExecutor.propose(
+            address(core), // target
+            0, // value
+            abi.encodeWithSelector(
+                core.addRecipient.selector,
+                alice, // _recipient
+                123 // _transactionLimit
+            ), // cdata
+            "Add Alice as a recipient"
+        );
+
+        // After waiting period
+        skip(snapShotExecutor.waitingPeriod());
+
+        // Should succeed if executed from Safe
+        safeTxHelper.executeSingle(GnosisTransaction({
+            to: address(snapShotExecutor),
+            value: 0,
+            data: abi.encodeWithSelector(
+                snapShotExecutor.execute.selector,
+                proposalId
+            )
+        }));
+
+        {
+            (bool approved,) = core.policyRecipients(alice);
+            vm.assertTrue(approved, "Alice should be a recipient after proposal executed");
+        }
+    }
+
+    /// @dev Safe should not be able to unilaterally change BORG policies
+    function test_RevertIf_BorgPolicyManagementNotOwner() public {
+        safeTxHelper.executeSingle(
+            GnosisTransaction({
+                to: address(core),
+                value: 0,
+                data: abi.encodeWithSelector(
+                    core.addRecipient.selector,
+                    alice, // _recipient
+                    123 // _transactionLimit
+                )
+            }),
+            abi.encodePacked("GS013") // expectRevertData (code: Safe transaction failed when gasPrice and safeTxGas were 0)
+        );
+    }
 }
