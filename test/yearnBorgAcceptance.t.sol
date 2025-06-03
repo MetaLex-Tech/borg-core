@@ -27,6 +27,7 @@ contract YearnBorgAcceptanceTest is Test {
     // Safe 1.3.0 Multi Send Call Only @ Ethereum mainnet
     // https://github.com/safe-global/safe-deployments?tab=readme-ov-file
     IMultiSendCallOnly multiSendCallOnly = IMultiSendCallOnly(0x40A2aCCbd92BCA938b02010E17A5b8929b49130D);
+    address multiSend = 0xA238CBeb142c10Ef7Ad8442C6D1f9E89e07e7761;
 
     IGnosisSafe ychadSafe = IGnosisSafe(0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52); // ychad.eth
 
@@ -473,6 +474,33 @@ contract YearnBorgAcceptanceTest is Test {
                 )
             }),
             abi.encodePacked("GS013") // expectRevertData (code: Safe transaction failed when gasPrice and safeTxGas were 0)
+        );
+    }
+
+    /// @dev Safe should be able to use MultiSendCallOnly because its whitelisted
+    function testMultiSendCallOnly() public {
+        deal(address(weth), address(ychadSafe), 1 ether);
+        uint256 balanceBefore = weth.balanceOf(alice);
+
+        GnosisTransaction[] memory safeTxs = new GnosisTransaction[](1);
+        safeTxs[0] = safeTxHelper.getTransferData(address(weth), alice, 1 ether);
+        safeTxHelper.executeBatch(safeTxs);
+
+        vm.assertEq(weth.balanceOf(alice) - balanceBefore, 1 ether);
+    }
+
+    /// @dev Safe should not be able to perform Operation.DelegateCall txs
+    function test_RevertIf_NonWhitelistedOperationDelegateCall() public {
+        deal(address(weth), address(ychadSafe), 1 ether);
+
+        GnosisTransaction[] memory safeTxs = new GnosisTransaction[](1);
+        safeTxs[0] = safeTxHelper.getTransferData(address(weth), alice, 1 ether);
+        safeTxHelper.executeData(
+            multiSend, // Use multiSend because it is not whitelisted
+            1,
+            safeTxHelper.getBatchExecutionData(safeTxs),
+            0,
+            abi.encodeWithSelector(borgCore.BORG_CORE_DelegateCallNotAuthorized.selector)
         );
     }
 }

@@ -35,13 +35,13 @@ contract YearnBorgDeployScript is Script {
     // Configs: BORG Core
 
     IGnosisSafe ychadSafe = IGnosisSafe(0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52); // ychad.eth
-    string borgIdentifier = "Yearn BORG"; // TODO WIP Ask for confirmation
+    string borgIdentifier = "Yearn BORG";
     borgCore.borgModes borgMode = borgCore.borgModes.blacklist;
     uint256 borgType = 0x3; // devBORG
 
     // Configs: SnapShowExecutor
 
-    uint256 snapShotWaitingPeriod = 3 days; // TODO Is it still necessary?
+    uint256 snapShotWaitingPeriod = 3 days;
     uint256 snapShotCancelPeriod = 7 days;
     uint256 snapShotPendingProposalLimit = 3;
     uint256 snapShotOracleTtl = 30 days;
@@ -89,6 +89,9 @@ contract YearnBorgDeployScript is Script {
 
         coreAuth = new BorgAuth();
         core = new borgCore(coreAuth, borgType, borgMode, borgIdentifier, address(ychadSafe));
+
+        // Whitelist MultiSendCallOnly for Operation.DelegateCall
+        core.toggleDelegateCallContract(address(multiSendCallOnly), true);
 
         // Restrict admin operations
 
