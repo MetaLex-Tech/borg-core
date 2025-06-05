@@ -316,6 +316,13 @@ contract borgCore is BaseGuard, BorgAuthACL, IEIP4824 {
             policy[_contract].delegateCallAllowed = _allowed;
             emit DelegateCallToggled(_contract, _allowed);
        }
+       else if(borgMode == borgModes.blacklist)
+       {
+        // Toggle will enable the contract policy
+        policy[_contract].enabled = true;
+        policy[_contract].delegateCallAllowed = _allowed;
+        emit DelegateCallToggled(_contract, _allowed);
+       }
        else
         revert BORG_CORE_InvalidContract();
     }
