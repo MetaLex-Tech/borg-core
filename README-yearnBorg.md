@@ -77,19 +77,6 @@ Once ychad is "BORGed", the following operations will require bilateral approval
 - Add / disable Modules
 - Set Guards
 
-## Restricted Advanced Operations
-
-Once ychad is "BORGed," the following operations are restricted for security reasons unless explicitly whitelisted:
-
-- Transactions executed in `DelegateCall` mode
-
-However, to ensure a seamless user experience, commonly used advanced operations are preemptively whitelisted, including:
-
-- Batch Transactions (via `MultiSendCallOnly`)
-
-Note: `MultiSendCallOnly` is whitelisted, but `MultiSend` is not, as it permits arbitrary `delegatecall`, posing security risks.
-Operations relying on `MultiSend`, such as manual fund distributions, can typically be performed using safer alternatives, like custom vetted contracts.
-
 ### Co-approval Workflows
 
 The process for bilateral ychad / DAO approvals will be as follows:
@@ -139,6 +126,19 @@ For safety, it cannot remove the `SudoImplant` Module itself.
 
 A ychad member can unilaterally resign by calling `EjectImplant.selfEject(false)` without approval. The Safe contract ensures threshold validity.
 Members are prohibited from calling `EjectImplant.selfEject(true)` as it would alter the multisig threshold. Consequently, they cannot self-resign when the remaining member count equals the threshold.
+
+## Restricted Advanced Operations
+
+Once ychad is "BORGed," the following operations are restricted for security reasons unless explicitly whitelisted:
+
+- Transactions executed in `DelegateCall` mode
+
+However, to ensure a seamless user experience, commonly used advanced operations are preemptively whitelisted, including:
+
+- Batch Transactions (via `MultiSendCallOnly`)
+
+Note: `MultiSendCallOnly` is whitelisted, but `MultiSend` is not, as it permits arbitrary `delegatecall`, posing security risks.
+Operations relying on `MultiSend`, such as manual fund distributions, can typically be performed using safer alternatives, like custom vetted contracts.
 
 ## Key Parameters
 
