@@ -29,7 +29,6 @@ graph TD
     
     borg -->|"guard"| ychad
 
-    ychad -->|"owner<br>execute(proposalId)"| snapshotExecutor
     
     %% implants -->|modules| ychad
     
@@ -39,6 +38,9 @@ graph TD
     oracleAddr -->|"oracle<br>propose(admin operation)"| snapshotExecutor      
     oracleAddr -->|monitor| yearnDaoVoting
     
+    ychad -->|"owner<br>execute(proposalId)"| snapshotExecutor
+    
+    snapshotExecutor -->|"owner<br>policy operation()"| borg
     snapshotExecutor -->|"owner<br>guard & module management operation()"| sudoImplant
     snapshotExecutor -->|"owner<br>member management operation()"| ejectImplant
     
@@ -69,7 +71,7 @@ If desired, can seek prior DAO social approval for these changes (and this is li
 
 ## Restricted Admin Operations
 
-Once ychad is "BORGed", the following actions will require bilateral approval of the DAO and ychad. Onchain, this means 'blacklisting' certain unilateral SAFE operations that would otherwise be possible, instead requiring DAO/ychad co-approval of such actions:
+Once ychad is "BORGed", the following operations will require bilateral approval of the DAO and ychad. Onchain, this means 'blacklisting' certain unilateral SAFE operations that would otherwise be possible, instead requiring DAO/ychad co-approval of such actions:
 
 - Add / remove / swap signers / change threshold
 - Add / disable Modules
@@ -124,6 +126,19 @@ For safety, it cannot remove the `SudoImplant` Module itself.
 
 A ychad member can unilaterally resign by calling `EjectImplant.selfEject(false)` without approval. The Safe contract ensures threshold validity.
 Members are prohibited from calling `EjectImplant.selfEject(true)` as it would alter the multisig threshold. Consequently, they cannot self-resign when the remaining member count equals the threshold.
+
+## Restricted Advanced Operations
+
+Once ychad is "BORGed," the following operations are restricted for security reasons unless explicitly whitelisted:
+
+- Transactions executed in `DelegateCall` mode
+
+However, to ensure a seamless user experience, commonly used advanced operations are preemptively whitelisted, including:
+
+- Batch Transactions (via `MultiSendCallOnly`)
+
+Note: `MultiSendCallOnly` is whitelisted, but `MultiSend` is not, as it permits arbitrary `delegatecall`, posing security risks.
+Operations relying on `MultiSend`, such as manual fund distributions, can typically be performed using safer alternatives, like custom vetted contracts.
 
 ## Key Parameters
 

@@ -27,6 +27,7 @@ contract YearnBorgAcceptanceTest is Test {
     // Safe 1.3.0 Multi Send Call Only @ Ethereum mainnet
     // https://github.com/safe-global/safe-deployments?tab=readme-ov-file
     IMultiSendCallOnly multiSendCallOnly = IMultiSendCallOnly(0x40A2aCCbd92BCA938b02010E17A5b8929b49130D);
+    address multiSend = 0xA238CBeb142c10Ef7Ad8442C6D1f9E89e07e7761;
 
     IGnosisSafe ychadSafe = IGnosisSafe(0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52); // ychad.eth
 
@@ -78,6 +79,7 @@ contract YearnBorgAcceptanceTest is Test {
         // Verify core auth roles
         {
             uint256 ownerRole = coreAuth.OWNER_ROLE();
+            coreAuth.onlyRole(ownerRole, address(snapShotExecutor));
             // Verify not owners
             vm.expectRevert(abi.encodeWithSelector(BorgAuth.BorgAuth_NotAuthorized.selector, ownerRole, address(ychadSafe)));
             coreAuth.onlyRole(ownerRole, address(ychadSafe));
@@ -418,5 +420,87 @@ contract YearnBorgAcceptanceTest is Test {
         }));
         assertEq(snapShotExecutor.pendingOracle(), address(1), "New oracle should be pending now");
         assertEq(snapShotExecutor.pendingOracleTtl(), 1 days, "New oracle TTL should be pending now");
+    }
+
+    /// @dev BORG policy management should succeed given DAO and ychad.eth's co-approval
+    function testBorgPolicyManagement() public {
+        {
+            (bool approved,) = core.policyRecipients(alice);
+            vm.assertFalse(approved, "Alice should not be a recipient before proposal");
+        }
+
+        // Propose to change BORG policies
+        vm.prank(oracle);
+        bytes32 proposalId = snapShotExecutor.propose(
+            address(core), // target
+            0, // value
+            abi.encodeWithSelector(
+                core.addRecipient.selector,
+                alice, // _recipient
+                123 // _transactionLimit
+            ), // cdata
+            "Add Alice as a recipient"
+        );
+
+        // After waiting period
+        skip(snapShotExecutor.waitingPeriod());
+
+        // Should succeed if executed from Safe
+        safeTxHelper.executeSingle(GnosisTransaction({
+            to: address(snapShotExecutor),
+            value: 0,
+            data: abi.encodeWithSelector(
+                snapShotExecutor.execute.selector,
+                proposalId
+            )
+        }));
+
+        {
+            (bool approved,) = core.policyRecipients(alice);
+            vm.assertTrue(approved, "Alice should be a recipient after proposal executed");
+        }
+    }
+
+    /// @dev Safe should not be able to unilaterally change BORG policies
+    function test_RevertIf_BorgPolicyManagementNotOwner() public {
+        safeTxHelper.executeSingle(
+            GnosisTransaction({
+                to: address(core),
+                value: 0,
+                data: abi.encodeWithSelector(
+                    core.addRecipient.selector,
+                    alice, // _recipient
+                    123 // _transactionLimit
+                )
+            }),
+            abi.encodePacked("GS013") // expectRevertData (code: Safe transaction failed when gasPrice and safeTxGas were 0)
+        );
+    }
+
+    /// @dev Safe should be able to use MultiSendCallOnly because its whitelisted
+    function testMultiSendCallOnly() public {
+        deal(address(weth), address(ychadSafe), 1 ether);
+        uint256 balanceBefore = weth.balanceOf(alice);
+
+        GnosisTransaction[] memory safeTxs = new GnosisTransaction[](1);
+        safeTxs[0] = safeTxHelper.getTransferData(address(weth), alice, 1 ether);
+        safeTxHelper.executeBatch(safeTxs);
+
+        vm.assertEq(weth.balanceOf(alice) - balanceBefore, 1 ether);
+    }
+
+    /// @dev Safe should not be able to perform Operation.DelegateCall txs
+    function test_RevertIf_NonWhitelistedOperationDelegateCall() public {
+        deal(address(weth), address(ychadSafe), 1 ether);
+
+        GnosisTransaction[] memory safeTxs = new GnosisTransaction[](1);
+        safeTxs[0] = safeTxHelper.getTransferData(address(weth), alice, 1 ether);
+        safeTxHelper.executeData(
+            multiSend, // Use multiSend because it is not whitelisted
+            1,
+            safeTxHelper.getBatchExecutionData(safeTxs),
+            0,
+            abi.encodeWithSelector(borgCore.BORG_CORE_DelegateCallNotAuthorized.selector)
+        );
     }
 }
