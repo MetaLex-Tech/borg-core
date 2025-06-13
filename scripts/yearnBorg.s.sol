@@ -44,7 +44,7 @@ contract YearnBorgDeployScript is Script {
     uint256 snapShotWaitingPeriod = 3 days;
     uint256 snapShotCancelPeriod = 7 days;
     uint256 snapShotPendingProposalLimit = 3;
-    uint256 snapShotOracleTtl = 30 days;
+    uint256 snapShotOracleTtl = 14 days;
     address oracle = 0xf00c0dE09574805389743391ada2A0259D6b7a00;
     
     SafeTxHelper safeTxHelper;
