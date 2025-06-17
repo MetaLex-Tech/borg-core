@@ -10,8 +10,8 @@ contract SnapShotExecutor is BorgAuthACL {
     uint256 public oracleTtl;
     address public pendingOracle;
     uint256 public pendingOracleTtl;
-    uint256 public waitingPeriod;
-    uint256 public proposalExpirySeconds;
+    uint256 public waitingPeriod; // Waiting time after proposal and before it can be executable
+    uint256 public cancelWaitingPeriod; // Waiting time after a proposal is executable and before it can be cancelled
     uint256 public pendingProposalCount;
     uint256 public pendingProposalLimit;
     uint256 public lastOraclePingTimestamp;
@@ -29,7 +29,7 @@ contract SnapShotExecutor is BorgAuthACL {
     error SnapShotExecutor_ProposalAlreadyExists();
     error SnapShotExecutor_WaitingPeriod();
     error SnapShotExecutor_NotExpired();
-    error SnapShotExeuctor_InvalidParams();
+    error SnapShotExecutor_InvalidParams();
     error SnapShotExecutor_TooManyPendingProposals();
     error SnapShotExecutor_OracleNotDead();
 
@@ -63,12 +63,12 @@ contract SnapShotExecutor is BorgAuthACL {
         _;
     }
 
-    constructor(BorgAuth _auth, address _oracle, uint256 _waitingPeriod, uint256 _proposalExpirySeconds, uint256 _pendingProposals, uint256 _oracleTtl) BorgAuthACL(_auth) {
+    constructor(BorgAuth _auth, address _oracle, uint256 _waitingPeriod, uint256 _cancelWaitingPeriod, uint256 _pendingProposals, uint256 _oracleTtl) BorgAuthACL(_auth) {
         oracle = _oracle;
-        if(_waitingPeriod < 1 minutes) revert SnapShotExeuctor_InvalidParams();
+        if(_waitingPeriod < 1 minutes) revert SnapShotExecutor_InvalidParams();
         waitingPeriod = _waitingPeriod;
-        if(_proposalExpirySeconds < 1 minutes) revert SnapShotExeuctor_InvalidParams();
-        proposalExpirySeconds = _proposalExpirySeconds;
+        if(_cancelWaitingPeriod < 1 minutes) revert SnapShotExecutor_InvalidParams();
+        cancelWaitingPeriod = _cancelWaitingPeriod;
         pendingProposalLimit = _pendingProposals;
         oracleTtl = _oracleTtl;
         lastOraclePingTimestamp = block.timestamp;
@@ -76,6 +76,7 @@ contract SnapShotExecutor is BorgAuthACL {
 
     function propose(address target, uint256 value, bytes calldata cdata, string memory description) external onlyOracle() returns (bytes32) {
         if(pendingProposalCount >= pendingProposalLimit) revert SnapShotExecutor_TooManyPendingProposals();
+        if(target == address(0)) revert SnapShotExecutor_InvalidProposal();
         bytes32 proposalId = keccak256(abi.encodePacked(target, value, cdata, description));
         // Make sure the new proposal does not duplicate a previous one, otherwise we wouldn't be able to cancel both
         if (pendingProposals[proposalId].target != address(0)) revert SnapShotExecutor_ProposalAlreadyExists();
@@ -97,7 +98,7 @@ contract SnapShotExecutor is BorgAuthACL {
 
     function cancel(bytes32 proposalId) external {
         proposal memory p = pendingProposals[proposalId];
-        if (p.executableAfter + proposalExpirySeconds > block.timestamp) revert SnapShotExecutor_NotExpired();
+        if (p.executableAfter + cancelWaitingPeriod > block.timestamp) revert SnapShotExecutor_NotExpired();
         if(p.target == address(0)) revert SnapShotExecutor_InvalidProposal();
         pendingProposalCount--;
         delete pendingProposals[proposalId];

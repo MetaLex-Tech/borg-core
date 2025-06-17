@@ -48,7 +48,7 @@ contract SnapShotExecutorTest is Test {
         assertEq(snapShotExecutor.oracle(), oracle, "Unexpected oracle address");
         assertEq(snapShotExecutor.pendingOracle(), address(0), "Unexpected pending oracle address");
         assertEq(snapShotExecutor.waitingPeriod(), 3 days, "Unexpected waitingPeriod");
-        assertEq(snapShotExecutor.proposalExpirySeconds(), 7 days, "Unexpected cancelPeriod");
+        assertEq(snapShotExecutor.cancelWaitingPeriod(), 7 days, "Unexpected cancelWaitingPeriod");
         assertEq(snapShotExecutor.pendingProposalCount(), 0, "Unexpected pendingProposalCount");
         assertEq(snapShotExecutor.pendingProposalLimit(), 3, "Unexpected pendingProposalLimit");
         assertEq(snapShotExecutor.oracleTtl(), 30 days, "Unexpected ORACLE_TTL");
@@ -159,6 +159,19 @@ contract SnapShotExecutorTest is Test {
         assertEq(description2, "Different descriptions", "Expect proposal2's description");
     }
 
+    /// @dev Should not be able to propose invalid proposals
+    function test_RevertIf_ProposalIsInvalid() public {
+        // Proposing invalid proposal should fail
+        vm.expectRevert(abi.encodeWithSelector(SnapShotExecutor.SnapShotExecutor_InvalidProposal.selector));
+        vm.prank(oracle);
+        snapShotExecutor.propose(
+            address(0), // invalid target
+            0, // value
+            "", // cdata
+            "Invalid proposal"
+        );
+    }
+
     /// @dev Non-oracle should not be able to propose
     function test_RevertIf_NotOracleProposal() public {
         vm.expectRevert(abi.encodeWithSelector(SnapShotExecutor.SnapShotExecutor_NotAuthorized.selector));
@@ -197,7 +210,7 @@ contract SnapShotExecutorTest is Test {
         snapShotExecutor.cancel(proposalId);
 
         // After cancel period
-        skip(snapShotExecutor.proposalExpirySeconds());
+        skip(snapShotExecutor.cancelWaitingPeriod());
 
         // cancel() should succeed now
 

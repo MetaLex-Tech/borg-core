@@ -26,7 +26,7 @@ contract YearnBorgReplaceSnapShotExecutorScript is Script {
     // Configs: SnapShowExecutor
     // Reuse the old one's parameters if we are just upgrading it to a newer version
     uint256 snapShotWaitingPeriod = oldSnapShotExecutor.waitingPeriod();
-    uint256 snapShotCancelPeriod = oldSnapShotExecutor.proposalExpirySeconds();
+    uint256 snapShotCancelWaitingPeriod = oldSnapShotExecutor.cancelWaitingPeriod();
     uint256 snapShotPendingProposalLimit = oldSnapShotExecutor.pendingProposalLimit();
     uint256 snapShotOracleTtl = oldSnapShotExecutor.oracleTtl();
     address oracle = oldSnapShotExecutor.oracle();
@@ -53,7 +53,7 @@ contract YearnBorgReplaceSnapShotExecutorScript is Script {
         vm.startBroadcast(deployerPrivateKey);
 
         // Deploy new SnapShotExecutor
-        SnapShotExecutor newSnapShotExecutor = new SnapShotExecutor(executorAuth, address(oracle), snapShotWaitingPeriod, snapShotCancelPeriod, snapShotPendingProposalLimit, snapShotOracleTtl);
+        SnapShotExecutor newSnapShotExecutor = new SnapShotExecutor(executorAuth, address(oracle), snapShotWaitingPeriod, snapShotCancelWaitingPeriod, snapShotPendingProposalLimit, snapShotOracleTtl);
 
         vm.stopBroadcast();
 

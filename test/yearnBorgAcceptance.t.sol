@@ -111,7 +111,7 @@ contract YearnBorgAcceptanceTest is Test {
     function testSnapShotExecutorMeta() public view {
         assertEq(snapShotExecutor.oracle(), oracle, "Unexpected oracle");
         assertEq(snapShotExecutor.waitingPeriod(), 3 days, "Unexpected waitingPeriod");
-        assertEq(snapShotExecutor.proposalExpirySeconds(), 7 days, "Unexpected cancelPeriod");
+        assertEq(snapShotExecutor.cancelWaitingPeriod(), 7 days, "Unexpected cancelWaitingPeriod");
         assertEq(snapShotExecutor.pendingProposalLimit(), 3, "Unexpected pendingProposalLimit");
         assertEq(snapShotExecutor.oracleTtl(), 14 days, "Unexpected ORACLE_TTL");
     }

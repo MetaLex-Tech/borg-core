@@ -42,7 +42,7 @@ contract YearnBorgDeployScript is Script {
     // Configs: SnapShowExecutor
 
     uint256 snapShotWaitingPeriod = 3 days;
-    uint256 snapShotCancelPeriod = 7 days;
+    uint256 snapShotCancelWaitingPeriod = 7 days;
     uint256 snapShotPendingProposalLimit = 3;
     uint256 snapShotOracleTtl = 14 days;
     address oracle = 0xf00c0dE09574805389743391ada2A0259D6b7a00;
@@ -71,7 +71,7 @@ contract YearnBorgDeployScript is Script {
         console2.log("  BORG type:", borgType);
         console2.log("  Safe Multisig:", address(ychadSafe));
         console2.log("  Snapshot waiting period (secs.):", snapShotWaitingPeriod);
-        console2.log("  Snapshot cancel period (secs.):", snapShotCancelPeriod);
+        console2.log("  Snapshot cancel period (secs.):", snapShotCancelWaitingPeriod);
         console2.log("  Snapshot pending proposal limit:", snapShotPendingProposalLimit);
 
         address deployerAddress = vm.addr(deployerPrivateKey);
@@ -112,7 +112,7 @@ contract YearnBorgDeployScript is Script {
         // Create SnapShotExecutor
 
         executorAuth = new BorgAuth();
-        snapShotExecutor = new SnapShotExecutor(executorAuth, address(oracle), snapShotWaitingPeriod, snapShotCancelPeriod, snapShotPendingProposalLimit, snapShotOracleTtl);
+        snapShotExecutor = new SnapShotExecutor(executorAuth, address(oracle), snapShotWaitingPeriod, snapShotCancelWaitingPeriod, snapShotPendingProposalLimit, snapShotOracleTtl);
 
         // Add modules
 
