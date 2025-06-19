@@ -155,17 +155,25 @@ Operations relying on `MultiSend`, such as manual fund distributions, can typica
 
 ## Deployment
 
-1. Run the deploy script
+1. Build all contracts with deploy script as the entrypoint.
+   This step is crucial to ensure consistent bytecodes across deployment and later verification, as they depend on
+   the compilation entrypoint (due to `--via-ir`)
    ```bash
-   forge script scripts/yearnBorg.s.sol --rpc-url <RPC URL> --optimize --optimizer-runs 200 --use solc:0.8.20 --via-ir --broadcast
+   forge build --optimize --optimizer-runs 200 --use solc:0.8.20 --via-ir scripts/yearnBorg.s.sol
    ```
 
-2. If got the following errors, force clean the cache with flag `--force`
+2. Run the deploy script (and verify it on Etherscan if possible)
+   ```bash
+   # Note the example uses Basescan
+   forge script scripts/yearnBorg.s.sol --rpc-url <RPC URL> --optimize --optimizer-runs 200 --use solc:0.8.20 --via-ir --tc YearnBorgDeployScript --etherscan-api-key $ETHERSCAN_API_KEY --verifier-url https://api.basescan.org/api --broadcast --verify
+   ```
+
+3. If got the following errors, clean all cache `rm -rf cache out` and redo from step 1
    ```
    Error: buffer overrun while deserializing
-   ```      
-   
-3. Take notes of the output Safe TXs (for setting guard & adding modules), for examples:
+   ```
+
+4. Take notes of the output Safe TXs (for setting guard & adding modules), for examples:
    ```
    Safe TXs:
     # 0
@@ -185,8 +193,31 @@ Operations relying on `MultiSend`, such as manual fund distributions, can typica
       value: 0
       data:
    0xe19a9dd9000000000000000000000000bc19387f5b8ae73fad41cd2294f928a735c60534
-   ```   
-4. Ask ychad to sign and execute the Safe TXs 
+   ```    
+
+5. Some of the contract verification may fail due to the aforementioned bytecode inconsistency. Manually verify them with the complete standard-json-input
+   ```bash
+   # `forge verify-contract` wouldn't work even though it uses Etherscan API under the hood.
+   # It is due to its hard-coded use of same contract name for generating standard-json-input and submission,
+   # while our hack needs separate names: scripts/yearnBorg.s.sol:YearnBorgDeployScript for generating standard-json-input 
+   # and src/borgCore.sol:borgCore for submission.
+   
+   # Therefore, we create the standard-json-input and call Etherscan API in two separate steps
+   forge verify-contract --watch --optimizer-runs 200 --compiler-version 'v0.8.20+commit.a1b79de6' --via-ir --chain-id 8453 --verifier etherscan --etherscan-api-key $ETHERSCAN_API_KEY --verifier-url https://api.basescan.org/api --constructor-args $(cast abi-encode 'constructor(address,uint256,uint8,string,address)' 0x558176a9c86E8B35F72C6dde732035887f902E2d 3 1 'Yearn BORG' 0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52) -vvv --show-standard-json-input 0xe1c90a1f8a9553b31110dd6feead76e79a6ed419 'scripts/yearnBorg.s.sol:YearnBorgDeployScript' > standard-json-input.json
+   curl --location 'https://api.basescan.org/api' \
+     --form 'apikey="<my-basescan-api-key>"' \
+     --form 'sourceCode="<content-of-standard-json-input.json>"' \
+     --form 'contractaddress="0x0c05BF611b4f3769e8BF3714C0AEedb965BEA40C"' \
+     --form 'codeformat="solidity-standard-json-input"' \
+     --form 'contractname="src/borgCore.sol:borgCore"' \
+     --form 'compilerversion="v0.8.20+commit.a1b79de6"' \
+     --form 'chainId="8453"' \
+     --form 'constructorArguements="0000000000000000000000003068979c38f387d9abda98143645f5061abdeb3d0000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000a0000000000000000000000000feb4acf3df3cdea7399794d0869ef76a6efaff52000000000000000000000000000000000000000000000000000000000000000a596561726e20424f524700000000000000000000000000000000000000000000"' \
+     --form 'module="contract"' \
+     --form 'action="verifysourcecode"'
+   ```
+
+6. Ask ychad to sign and execute the Safe TXs 
 
 ## Tests
 
