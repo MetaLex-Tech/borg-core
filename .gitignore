@@ -7,3 +7,5 @@ broadcast/
 .DS_Store
 .idea/
 /broadcast_bk
+
+/tmp/

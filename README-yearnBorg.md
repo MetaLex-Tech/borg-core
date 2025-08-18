@@ -162,11 +162,43 @@ Operations relying on `MultiSend`, such as manual fund distributions, can typica
    forge build --optimize --optimizer-runs 200 --use solc:0.8.20 --via-ir scripts/yearnBorg.s.sol
    ```
 
-2. Run the deploy script (and verify it on Etherscan if possible)
+2. Run the deploy script (and verify it on Etherscan)
    ```bash
    # Note the example uses Basescan
    forge script scripts/yearnBorg.s.sol --rpc-url <RPC URL> --optimize --optimizer-runs 200 --use solc:0.8.20 --via-ir --tc YearnBorgDeployScript --etherscan-api-key $ETHERSCAN_API_KEY --verifier-url https://api.basescan.org/api --broadcast --verify
    ```
+
+   1. If verification failed, retry with the following command
+      ```bash
+      forge verify-contract --watch --optimizer-runs 200 --compiler-version 'v0.8.20+commit.a1b79de6' --via-ir --chain-id 1 <contract address> '<fully qualified contract name>'      
+      ```
+      
+   2. When `--via-ir` is used, `forge verify-contract` may not be able to verify certain complex contracts due to unstable bytecodes. In such cases we will do it manually by submitting a standard JSON input file through Etherscan API:
+      ```bash
+      # Example: if `borgCore` failed the verification
+      Submitting verification for [src/borgCore.sol:borgCore]
+      ...
+      Details: `Fail - Unable to verify. Compiled contract deployment bytecode does NOT match the transaction deployment bytecode.`
+      Error: Failed to verify contract: Checking verification result failed; Contract failed to verify.
+
+      # Regardless of which contract we are verifying, we must always generate the standard JSON input file from the deploy script (scripts/yearnBorg.s.sol).
+      # This way Etherscan would compile to exactly the same bytecodes as we deployed and pass the verification.
+      # Note since we only want to create the standard JSON input file, contract address does not matter and we can use `0x0000000000000000000000000000000000000000` instead.
+      forge verify-contract --watch --optimizer-runs 200 --compiler-version 'v0.8.20+commit.a1b79de6' --via-ir --chain-id <chain-id> --show-standard-json-input 0x0000000000000000000000000000000000000000 'scripts/yearnBorg.s.sol:YearnBorgDeployScript' > standard-json-input.json
+      
+      # Submit the verification manually through Etherscan API
+      curl --location '<etherscan API endpoint>' \
+         --form 'apikey="<Etherscan API key>"' \
+         --form 'sourceCode=<content of standard-json-input.json>' \
+         --form 'contractaddress="<contract address>"' \
+         --form 'codeformat="solidity-standard-json-input"' \
+         --form 'contractname="src/borgCore.sol:borgCore"' \
+         --form 'compilerversion="v0.8.20+commit.a1b79de6"' \
+         --form 'chainId="<chain ID>"' \
+         --form 'constructorArguements="<hex without 0x>"' \
+         --form 'module="contract"' \
+         --form 'action="verifysourcecode"'      
+         ```
 
 3. If got the following errors, clean all cache `rm -rf cache out` and redo from step 1
    ```
