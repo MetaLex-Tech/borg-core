@@ -22,6 +22,9 @@ contract MockYearnGovExecutor {
 }
 
 contract YearnBorgAcceptanceTest is Test {
+    // randomly generated to avoid conflicts with contaminated test addresses
+    uint256 privateKeySalt = 0x814091384c3d049f89f0ab722e0eefb9b2526f0577d44853f669355c4955e82f;
+
     ERC20 weth = ERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2); // Ethereum mainnet
 
     // Safe 1.3.0 Multi Send Call Only @ Ethereum mainnet
@@ -35,10 +38,10 @@ contract YearnBorgAcceptanceTest is Test {
 
     address deployer = address(0); // TODO Update after deployment
 
-    uint256 testSignerPrivateKey = 1;
+    uint256 testSignerPrivateKey = privateKeySalt + 1;
     address testSigner = vm.addr(testSignerPrivateKey);
     
-    address alice = vm.addr(2);
+    address alice = vm.addr(privateKeySalt + 2);
 
     SafeTxHelper safeTxHelper = new SafeTxHelper(ychadSafe, multiSendCallOnly, testSignerPrivateKey);
     
