@@ -36,7 +36,7 @@ contract YearnBorgAcceptanceTest is Test {
 
     address oracle = 0xf00c0dE09574805389743391ada2A0259D6b7a00;
 
-    address deployer = address(0); // TODO Update after deployment
+    address deployer = 0x4de2f144ddCc59c8A2Eb758d879396f1ABe46385;
 
     uint256 testSignerPrivateKey = privateKeySalt + 1;
     address testSigner = vm.addr(testSignerPrivateKey);
@@ -55,10 +55,10 @@ contract YearnBorgAcceptanceTest is Test {
     function setUp() public virtual {
         // Assume Ethereum mainnet fork after block 22268905
 
-        core = borgCore(0xDeaDbeefdEAdbeefdEadbEEFdeadbeEFdEaDbeeF); // TODO Update after deployment
-        eject = ejectImplant(0xDeaDbeefdEAdbeefdEadbEEFdeadbeEFdEaDbeeF); // TODO Update after deployment
-        sudo = sudoImplant(0xDeaDbeefdEAdbeefdEadbEEFdeadbeEFdEaDbeeF); // TODO Update after deployment
-        snapShotExecutor = SnapShotExecutor(0xDeaDbeefdEAdbeefdEadbEEFdeadbeEFdEaDbeeF); // TODO Update after deployment
+        core = borgCore(0xE1c90A1f8a9553b31110dD6FEEAd76E79a6ED419);
+        eject = ejectImplant(0x991c8581Df1Bb51672e958a7fDCbE74288A1acAC);
+        sudo = sudoImplant(0xbe01DAdf8C85277ab8db9Ceaa1cB5A5f24426Cc7);
+        snapShotExecutor = SnapShotExecutor(0xE8Bd6Ee2A38709e677b02C875aD73d0aE373EB5C);
     }
 
     /// @dev BORG Core metadata should meet specs
