@@ -1,0 +1,516 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+pragma solidity 0.8.20;
+
+import "forge-std/Test.sol";
+import "solady/tokens/ERC20.sol";
+import {Ownable} from "openzeppelin/contracts/access/Ownable.sol";
+import {borgCore} from "../src/borgCore.sol";
+import {ejectImplant} from "../src/implants/ejectImplant.sol";
+import {sudoImplant} from "../src/implants/sudoImplant.sol";
+import {BorgAuth} from "../src/libs/auth.sol";
+import {SnapShotExecutor} from "../src/libs/governance/snapShotExecutor.sol";
+import {SafeTxHelper} from "./libraries/safeTxHelper.sol";
+import {IGnosisSafe, GnosisTransaction, IMultiSendCallOnly} from "../test/libraries/safe.t.sol";
+
+/// @dev For demonstration only. We are not opinionated on the implementation details of the actual on-chain governance contract as long as
+///  it passes along all necessary instructions through `SnapShotExecutor.propose()` after the voting is passed
+contract MockYearnGovExecutor {
+    // Again, the function signature does not have to be exact
+    function proposeToSnapshotExecutor(SnapShotExecutor snapShotExecutor, address target, uint256 value, bytes calldata cdata, string memory description) external returns (bytes32) {
+        return snapShotExecutor.propose(target, value, cdata, description);
+    }
+}
+
+contract YearnBorgAcceptanceTest is Test {
+    // randomly generated to avoid conflicts with contaminated test addresses
+    uint256 privateKeySalt = 0x814091384c3d049f89f0ab722e0eefb9b2526f0577d44853f669355c4955e82f;
+
+    ERC20 weth = ERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2); // Ethereum mainnet
+
+    // Safe 1.3.0 Multi Send Call Only @ Ethereum mainnet
+    // https://github.com/safe-global/safe-deployments?tab=readme-ov-file
+    IMultiSendCallOnly multiSendCallOnly = IMultiSendCallOnly(0x40A2aCCbd92BCA938b02010E17A5b8929b49130D);
+    address multiSend = 0xA238CBeb142c10Ef7Ad8442C6D1f9E89e07e7761;
+
+    IGnosisSafe ychadSafe = IGnosisSafe(0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52); // ychad.eth
+
+    address oracle = 0xf00c0dE09574805389743391ada2A0259D6b7a00;
+
+    address deployer = 0x4de2f144ddCc59c8A2Eb758d879396f1ABe46385;
+
+    uint256 testSignerPrivateKey = privateKeySalt + 1;
+    address testSigner = vm.addr(testSignerPrivateKey);
+    
+    address alice = vm.addr(privateKeySalt + 2);
+
+    SafeTxHelper safeTxHelper;
+    
+    borgCore core;
+    ejectImplant eject;
+    sudoImplant sudo;
+    SnapShotExecutor snapShotExecutor;
+
+    /// If run directly, it will test against the predefined deployment. This way it can be run reliably in CICD.
+    /// Furthermore, one could override it for dynamic integration tests.
+    function setUp() public virtual {
+        assertEq(block.chainid, 1, "Fork test: Ethereum mainnet only");
+
+        core = borgCore(0xE1c90A1f8a9553b31110dD6FEEAd76E79a6ED419);
+        eject = ejectImplant(0x991c8581Df1Bb51672e958a7fDCbE74288A1acAC);
+        sudo = sudoImplant(0xbe01DAdf8C85277ab8db9Ceaa1cB5A5f24426Cc7);
+        snapShotExecutor = SnapShotExecutor(0xE8Bd6Ee2A38709e677b02C875aD73d0aE373EB5C);
+
+        safeTxHelper = new SafeTxHelper(ychadSafe, multiSendCallOnly, testSignerPrivateKey);
+        vm.label(address(safeTxHelper), "SafeTxHelper");
+
+        // Simulate changing ychad.eth threshold and adding the test owner so we can run tests
+        vm.prank(address(ychadSafe));
+        ychadSafe.addOwnerWithThreshold(testSigner, 1);
+    }
+
+    /// @dev BORG Core metadata should meet specs
+    function testBorgMeta() public view {
+        assertEq(core.id(), "Yearn BORG", "Unexpected BORG ID");
+        assertEq(core.borgType(), 0x3, "Unexpected BORG Core type");
+        assertEq(uint8(core.borgMode()), uint8(borgCore.borgModes.blacklist), "Unexpected BORG Core mode");
+    }
+
+    /// @dev BorgAuth instances should be proper assigned and configured
+    function testAuth() public {
+        assertEq(address(eject.AUTH()), address(sudo.AUTH()), "All implant's auth should be the same");
+
+        BorgAuth coreAuth = core.AUTH();
+        BorgAuth executorAuth = snapShotExecutor.AUTH();
+        BorgAuth implantAuth = eject.AUTH();
+
+        assertNotEq(address(coreAuth), address(executorAuth), "Core auth instance should not be the same as executor's");
+        assertNotEq(address(coreAuth), address(implantAuth), "Core auth instance should not be the same as implant's");
+
+        // Verify core auth roles
+        {
+            uint256 ownerRole = coreAuth.OWNER_ROLE();
+            coreAuth.onlyRole(ownerRole, address(snapShotExecutor));
+            // Verify not owners
+            vm.expectRevert(abi.encodeWithSelector(BorgAuth.BorgAuth_NotAuthorized.selector, ownerRole, address(ychadSafe)));
+            coreAuth.onlyRole(ownerRole, address(ychadSafe));
+            vm.expectRevert(abi.encodeWithSelector(BorgAuth.BorgAuth_NotAuthorized.selector, ownerRole, address(deployer)));
+            coreAuth.onlyRole(ownerRole, address(deployer));
+        }
+
+        // Verify executor auth roles
+        {
+            uint256 ownerRole = executorAuth.OWNER_ROLE();
+            executorAuth.onlyRole(ownerRole, address(ychadSafe));
+            // Verify not owners
+            vm.expectRevert(abi.encodeWithSelector(BorgAuth.BorgAuth_NotAuthorized.selector, ownerRole, address(deployer)));
+            executorAuth.onlyRole(ownerRole, address(deployer));
+        }
+
+        // Verify implant auth roles
+        {
+            uint256 ownerRole = implantAuth.OWNER_ROLE();
+            implantAuth.onlyRole(ownerRole, address(snapShotExecutor));
+            // Verify not owners
+            vm.expectRevert(abi.encodeWithSelector(BorgAuth.BorgAuth_NotAuthorized.selector, ownerRole, address(ychadSafe)));
+            implantAuth.onlyRole(ownerRole, address(ychadSafe));
+            vm.expectRevert(abi.encodeWithSelector(BorgAuth.BorgAuth_NotAuthorized.selector, ownerRole, address(deployer)));
+            implantAuth.onlyRole(ownerRole, address(deployer));
+        }
+    }
+
+    function testSnapShotExecutorMeta() public view {
+        assertEq(snapShotExecutor.oracle(), oracle, "Unexpected oracle");
+        assertEq(snapShotExecutor.waitingPeriod(), 3 days, "Unexpected waitingPeriod");
+        assertEq(snapShotExecutor.cancelWaitingPeriod(), 7 days, "Unexpected cancelWaitingPeriod");
+        assertEq(snapShotExecutor.pendingProposalLimit(), 3, "Unexpected pendingProposalLimit");
+        assertEq(snapShotExecutor.oracleTtl(), 14 days, "Unexpected ORACLE_TTL");
+    }
+
+    function testEjectImplantMeta() public view {
+        assertEq(eject.failSafeSignerThreshold(), 0, "Unexpected failSafeSignerThreshold");
+        assertTrue(eject.ALLOW_AUTH_MANAGEMENT(), "Auth management should be allowed");
+        assertTrue(eject.ALLOW_AUTH_EJECT(), "Auth ejection should be allowed");
+        assertFalse(eject.ALLOW_AUTH_SELF_EJECT_REDUCE(), "Auth self-eject with reduce should not be allowed");
+    }
+
+    /// @dev Safe normal operations should be unrestricted
+    function testSafeOpUnrestricted() public {
+        {
+            uint256 balanceBefore = alice.balance;
+            deal(address(ychadSafe), 1 ether);
+            safeTxHelper.executeSingle(safeTxHelper.getNativeTransferData(alice, 1 ether));
+            vm.assertEq(alice.balance - balanceBefore, 1 ether);
+        }
+
+        {
+            uint256 balanceBefore = weth.balanceOf(alice);
+            deal(address(weth), address(ychadSafe), 1 ether);
+            safeTxHelper.executeSingle(safeTxHelper.getTransferData(address(weth), alice, 1 ether));
+            vm.assertEq(weth.balanceOf(alice) - balanceBefore, 1 ether);
+        }
+    }
+
+    /// @dev Safe signers should be able to self-resign
+    function testSelfEject() public {
+        vm.assertTrue(ychadSafe.isOwner(testSigner), "Should be Safe signer");
+
+        // Self-resign without changing threshold
+        uint256 thresholdBefore = ychadSafe.getThreshold();
+
+        // Self-resign with threshold reduce should not be allowed
+        vm.expectRevert(abi.encodeWithSelector(ejectImplant.ejectImplant_ActionNotEnabled.selector));
+        vm.prank(testSigner);
+        eject.selfEject(true);
+
+        // Otherwise, it should pass
+        vm.prank(testSigner);
+        eject.selfEject(false);
+
+        vm.assertFalse(ychadSafe.isOwner(testSigner), "Should not be Safe signer");
+        vm.assertEq(ychadSafe.getThreshold(), thresholdBefore, "Threshold should not change");
+    }
+
+    /// @dev Member Management should succeed given DAO and ychad.eth's co-approval
+    function testMemberManagement() public {
+        vm.assertFalse(ychadSafe.isOwner(alice), "Should not be Safe signer");
+
+        vm.prank(oracle);
+        bytes32 proposalId = snapShotExecutor.propose(
+            address(eject), // target
+            0, // value
+            abi.encodeWithSelector(
+                bytes4(keccak256("addOwner(address)")),
+                alice // newOwner
+            ), // cdata
+            "Add Alice as new signer"
+        );
+
+        // After waiting period
+        skip(snapShotExecutor.waitingPeriod());
+
+        // Should fail if not executed from Safe
+        vm.expectRevert(abi.encodeWithSelector(BorgAuth.BorgAuth_NotAuthorized.selector, snapShotExecutor.AUTH().OWNER_ROLE(), address(this)));
+        snapShotExecutor.execute(proposalId);
+
+        // Should succeed if executed from Safe
+        safeTxHelper.executeSingle(GnosisTransaction({
+            to: address(snapShotExecutor),
+            value: 0,
+            data: abi.encodeWithSelector(
+                snapShotExecutor.execute.selector,
+                proposalId
+            )
+        }));
+
+        vm.assertTrue(ychadSafe.isOwner(alice), "Should be Safe signer");
+    }
+
+    /// @dev Guard Management should succeed given DAO and ychad.eth's co-approval
+    function testGuardManagement() public {
+        vm.assertEq(safeTxHelper.getGuard(address(ychadSafe)), address(core), "BORG core should be Guard of ychad.eth");
+
+        vm.prank(oracle);
+        bytes32 proposalId = snapShotExecutor.propose(
+            address(sudo), // target
+            0, // value
+            abi.encodeWithSelector(
+                sudoImplant.setGuard.selector,
+                address(0) // newGuard
+            ), // cdata
+            "Remove Guard"
+        );
+
+        // After waiting period
+        skip(snapShotExecutor.waitingPeriod());
+
+        // Should fail if not executed from Safe
+        vm.expectRevert(abi.encodeWithSelector(BorgAuth.BorgAuth_NotAuthorized.selector, snapShotExecutor.AUTH().OWNER_ROLE(), address(this)));
+        snapShotExecutor.execute(proposalId);
+
+        // Should succeed if executed from Safe
+        safeTxHelper.executeSingle(GnosisTransaction({
+            to: address(snapShotExecutor),
+            value: 0,
+            data: abi.encodeWithSelector(
+                snapShotExecutor.execute.selector,
+                proposalId
+            )
+        }));
+
+        vm.assertEq(safeTxHelper.getGuard(address(ychadSafe)), address(0), "ychad.eth should have no Guard");
+    }
+
+    /// @dev Module Management should succeed given DAO and ychad.eth's co-approval
+    function testModuleManagement() public {
+        vm.assertTrue(ychadSafe.isModuleEnabled(address(eject)), "ejectImplant should be enabled");
+
+        vm.prank(oracle);
+        bytes32 proposalId = snapShotExecutor.propose(
+            address(sudo), // target
+            0, // value
+            abi.encodeWithSelector(
+                sudoImplant.disableModule.selector,
+                address(eject) // module
+            ), // cdata
+            "Disable Eject Implant"
+        );
+
+        // After waiting period
+        skip(snapShotExecutor.waitingPeriod());
+
+        // Should fail if not executed from Safe
+        vm.expectRevert(abi.encodeWithSelector(BorgAuth.BorgAuth_NotAuthorized.selector, snapShotExecutor.AUTH().OWNER_ROLE(), address(this)));
+        snapShotExecutor.execute(proposalId);
+
+        // Should succeed if executed from Safe
+        safeTxHelper.executeSingle(GnosisTransaction({
+            to: address(snapShotExecutor),
+            value: 0,
+            data: abi.encodeWithSelector(
+                snapShotExecutor.execute.selector,
+                proposalId
+            )
+        }));
+
+        vm.assertFalse(ychadSafe.isModuleEnabled(address(eject)), "ejectImplant should be disabled");
+    }
+
+    /// @dev Transition to on-chain governance should be successful with co-approval
+    function testOnChainGovernanceTransition() public {
+        MockYearnGovExecutor yearnGovExecutor = new MockYearnGovExecutor();
+
+        BorgAuth implantAuth = eject.AUTH();
+        uint256 ownerRole = implantAuth.OWNER_ROLE();
+
+        // Should not be owner yet
+        vm.expectRevert(abi.encodeWithSelector(BorgAuth.BorgAuth_NotAuthorized.selector, ownerRole, address(yearnGovExecutor)));
+        implantAuth.onlyRole(ownerRole, address(yearnGovExecutor));
+
+        // Simulate on-chain governance transition
+        {
+            // SnapShotExecutor to assign YearnGovExecutor as the new oracle
+            vm.prank(oracle);
+            bytes32 proposalIdTransferOracle = snapShotExecutor.propose(
+                address(snapShotExecutor), // target
+                0, // value
+                abi.encodeWithSelector(
+                    snapShotExecutor.transferOracle.selector,
+                    address(yearnGovExecutor),
+                    1095 days // 3 years
+                ), // cdata
+                "Set yearnGovExecutor as new oracle"
+            );
+
+            // After waiting period
+            skip(snapShotExecutor.waitingPeriod());
+
+            // Should succeed if executed from Safe
+            safeTxHelper.executeSingle(GnosisTransaction({
+                to: address(snapShotExecutor),
+                value: 0,
+                data: abi.encodeWithSelector(
+                    snapShotExecutor.execute.selector,
+                    proposalIdTransferOracle
+                )
+            }));
+
+            // YearnGovExecutor should be a pending oracle now, and it will assume the oracle role the next time it interacts with snapShotExecutor
+            assertEq(snapShotExecutor.pendingOracle(), address(yearnGovExecutor), "yearnGovExecutor should be pending as new oracle");
+            assertEq(snapShotExecutor.pendingOracleTtl(), 1095 days, "Unexpected pending oracle TTL");
+        }
+
+        // Simulate adding member through on-chain governance
+        {
+            vm.assertFalse(ychadSafe.isOwner(alice), "Should not be Safe signer");
+
+            // Assume the voting passed and `yearnGovExecutor` proposes to `snapShotExecutor`
+            bytes32 proposalId = yearnGovExecutor.proposeToSnapshotExecutor(
+                snapShotExecutor,
+                address(eject), // target
+                0, //value
+                abi.encodeWithSelector(
+                    bytes4(keccak256("addOwner(address)")),
+                    alice // newOwner
+                ), // cdata
+                "Add Alice as new signer"
+            );
+
+            // After waiting period
+            skip(snapShotExecutor.waitingPeriod());
+
+            // Safe should be able to execute it and add Alice as new signer
+            safeTxHelper.executeSingle(GnosisTransaction({
+                to: address(snapShotExecutor),
+                value: 0,
+                data: abi.encodeWithSelector(
+                    snapShotExecutor.execute.selector,
+                    proposalId
+                )
+            }));
+
+            vm.assertTrue(ychadSafe.isOwner(alice), "Should be Safe signer");
+        }
+    }
+
+    /// @dev Non-oracle should not be able to propose
+    function test_RevertIf_NotOracle() public {
+        vm.expectRevert(abi.encodeWithSelector(SnapShotExecutor.SnapShotExecutor_NotAuthorized.selector));
+        snapShotExecutor.propose(
+            address(eject), // target
+            0, // value
+            "", // cdata
+            "Arbitrary instruction"
+        );
+    }
+
+    /// @dev Safe should be able to unilaterally perform non-restricted admin operations without DAO approval
+    function testAllowedAdminOperations() public {
+        // The test cases are NOT exhaustive
+
+        // Safe
+        safeTxHelper.executeSingle(safeTxHelper.getGetThresholdData());
+    }
+
+    /// @dev Safe should not be able to unilaterally perform restricted admin operations without DAO approval
+    function test_RevertIf_RestrictedAdminOperations() public {
+        // The test cases are exhaustive
+
+        // Safe.OwnerManager
+
+        safeTxHelper.executeSingle(
+            safeTxHelper.getAddOwnerData(alice), // tx
+            abi.encodeWithSelector(borgCore.BORG_CORE_MethodNotAuthorized.selector) // expectRevertData
+        );
+        safeTxHelper.executeSingle(
+            safeTxHelper.getRemoveOwnerData(address(0x1), testSigner), // tx
+            abi.encodeWithSelector(borgCore.BORG_CORE_MethodNotAuthorized.selector) // expectRevertData
+        );
+        safeTxHelper.executeSingle(
+            safeTxHelper.getSwapOwnerData(address(0x1), testSigner, alice), // tx
+            abi.encodeWithSelector(borgCore.BORG_CORE_MethodNotAuthorized.selector) // expectRevertData
+        );
+        safeTxHelper.executeSingle(
+            safeTxHelper.getChangeThresholdData(2), // tx
+            abi.encodeWithSelector(borgCore.BORG_CORE_MethodNotAuthorized.selector) // expectRevertData
+        );
+
+        // Safe.GuardManager
+
+        safeTxHelper.executeSingle(
+            safeTxHelper.getSetGuardData(address(0)), // tx
+            abi.encodeWithSelector(borgCore.BORG_CORE_MethodNotAuthorized.selector) // expectRevertData
+        );
+
+        // Safe.ModuleManager
+
+        safeTxHelper.executeSingle(
+            safeTxHelper.getAddModuleData(address(0)), // tx
+            abi.encodeWithSelector(borgCore.BORG_CORE_MethodNotAuthorized.selector) // expectRevertData
+        );
+        safeTxHelper.executeSingle(
+            safeTxHelper.getDisableModuleData(address(0), address(eject)), // tx
+            abi.encodeWithSelector(borgCore.BORG_CORE_MethodNotAuthorized.selector) // expectRevertData
+        );
+    }
+
+    /// @dev Safe should be able to replace a dead oracle
+    function testTransferExpiredOracle() public {
+        // Let the old oracle expire, then transfer it
+        skip(snapShotExecutor.oracleTtl());
+
+        // Safe should be able to replace the dead oracle unilaterally
+        safeTxHelper.executeSingle(GnosisTransaction({
+            to: address(snapShotExecutor),
+            value: 0,
+            data: abi.encodeWithSelector(
+                snapShotExecutor.transferExpiredOracle.selector,
+                address(1), // new oracle
+                1 days // new oracle TTL
+            )
+        }));
+        assertEq(snapShotExecutor.pendingOracle(), address(1), "New oracle should be pending now");
+        assertEq(snapShotExecutor.pendingOracleTtl(), 1 days, "New oracle TTL should be pending now");
+    }
+
+    /// @dev BORG policy management should succeed given DAO and ychad.eth's co-approval
+    function testBorgPolicyManagement() public {
+        {
+            (bool approved,) = core.policyRecipients(alice);
+            vm.assertFalse(approved, "Alice should not be a recipient before proposal");
+        }
+
+        // Propose to change BORG policies
+        vm.prank(oracle);
+        bytes32 proposalId = snapShotExecutor.propose(
+            address(core), // target
+            0, // value
+            abi.encodeWithSelector(
+                core.addRecipient.selector,
+                alice, // _recipient
+                123 // _transactionLimit
+            ), // cdata
+            "Add Alice as a recipient"
+        );
+
+        // After waiting period
+        skip(snapShotExecutor.waitingPeriod());
+
+        // Should succeed if executed from Safe
+        safeTxHelper.executeSingle(GnosisTransaction({
+            to: address(snapShotExecutor),
+            value: 0,
+            data: abi.encodeWithSelector(
+                snapShotExecutor.execute.selector,
+                proposalId
+            )
+        }));
+
+        {
+            (bool approved,) = core.policyRecipients(alice);
+            vm.assertTrue(approved, "Alice should be a recipient after proposal executed");
+        }
+    }
+
+    /// @dev Safe should not be able to unilaterally change BORG policies
+    function test_RevertIf_BorgPolicyManagementNotOwner() public {
+        safeTxHelper.executeSingle(
+            GnosisTransaction({
+                to: address(core),
+                value: 0,
+                data: abi.encodeWithSelector(
+                    core.addRecipient.selector,
+                    alice, // _recipient
+                    123 // _transactionLimit
+                )
+            }),
+            abi.encodePacked("GS013") // expectRevertData (code: Safe transaction failed when gasPrice and safeTxGas were 0)
+        );
+    }
+
+    /// @dev Safe should be able to use MultiSendCallOnly because its whitelisted
+    function testMultiSendCallOnly() public {
+        deal(address(weth), address(ychadSafe), 1 ether);
+        uint256 balanceBefore = weth.balanceOf(alice);
+
+        GnosisTransaction[] memory safeTxs = new GnosisTransaction[](1);
+        safeTxs[0] = safeTxHelper.getTransferData(address(weth), alice, 1 ether);
+        safeTxHelper.executeBatch(safeTxs);
+
+        vm.assertEq(weth.balanceOf(alice) - balanceBefore, 1 ether);
+    }
+
+    /// @dev Safe should not be able to perform Operation.DelegateCall txs
+    function test_RevertIf_NonWhitelistedOperationDelegateCall() public {
+        deal(address(weth), address(ychadSafe), 1 ether);
+
+        GnosisTransaction[] memory safeTxs = new GnosisTransaction[](1);
+        safeTxs[0] = safeTxHelper.getTransferData(address(weth), alice, 1 ether);
+        safeTxHelper.executeData(
+            multiSend, // Use multiSend because it is not whitelisted
+            1,
+            safeTxHelper.getBatchExecutionData(safeTxs),
+            0,
+            abi.encodeWithSelector(borgCore.BORG_CORE_DelegateCallNotAuthorized.selector)
+        );
+    }
+}

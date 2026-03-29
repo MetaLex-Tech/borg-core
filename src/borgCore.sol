@@ -83,7 +83,15 @@ contract borgCore is BaseGuard, BorgAuthACL, IEIP4824 {
     string private _daoUri; // URI for the DAO
     LegalAgreement[] public legalAgreements; // array of legal agreements URIs for this BORG
     string public constant VERSION = "1.0.0"; // contract version
+
+    // 0x1 securityBORG/eBORG
+    // 0x2 grantsBORG
+    // 0x3 devBORG
+    // 0x4 finBORG
+    // 0x5 genBORG
+    // 0x6 bzBORG
     uint256 public immutable borgType; // type of the BORG
+
     enum borgModes { 
         whitelist, // everything is restricted except what has been whitelisted
         blacklist, // everything is allowed except contracts and methods that have been blacklisted. Param checks work the same as whitelist
@@ -188,13 +196,18 @@ contract borgCore is BaseGuard, BorgAuthACL, IEIP4824 {
                 lastNativeExecutionTimestamp = block.timestamp;
             } 
 
+            // Block all delegate calls by default in blacklist mode
+            if(operation == Enum.Operation.DelegateCall) {
+                // Only allow if contract is explicitly whitelisted for delegate calls
+                if(!policy[to].enabled || !policy[to].delegateCallAllowed) {
+                    revert BORG_CORE_DelegateCallNotAuthorized();
+                }
+            }
+
             //black list contract calls w/ data
              if (data.length > 0) {
                 if(policy[to].enabled) {
                     if(policy[to].fullAccessOrBlock) revert BORG_CORE_InvalidContract();
-                    if(!policy[to].delegateCallAllowed && operation == Enum.Operation.DelegateCall) {
-                        revert BORG_CORE_DelegateCallNotAuthorized();
-                    }
 
                     if(!isMethodCallAllowed(to, data))
                             revert BORG_CORE_MethodNotAuthorized();
@@ -297,11 +310,18 @@ contract borgCore is BaseGuard, BorgAuthACL, IEIP4824 {
     /// @param _contract address, the address of the contract
     /// @param _allowed bool, the flag to allow delegate calls
     function toggleDelegateCallContract(address _contract, bool _allowed) external onlyOwner {
-       //ensure the contract is allowed before enabling delegate calls
+        //ensure the contract is allowed before enabling delegate calls
        if(policy[_contract].enabled == true)
        {
             policy[_contract].delegateCallAllowed = _allowed;
             emit DelegateCallToggled(_contract, _allowed);
+       }
+       else if(borgMode == borgModes.blacklist)
+       {
+        // Toggle will enable the contract policy
+        policy[_contract].enabled = true;
+        policy[_contract].delegateCallAllowed = _allowed;
+        emit DelegateCallToggled(_contract, _allowed);
        }
        else
         revert BORG_CORE_InvalidContract();
@@ -641,12 +661,12 @@ contract borgCore is BaseGuard, BorgAuthACL, IEIP4824 {
         bytes4 methodSelector = bytes4(_methodCallData[:4]);
         MethodConstraint storage methodConstraint = policy[_contract].methods[methodSelector];
 
-        if (!methodConstraint.enabled && borgMode == borgModes.whitelist) 
+        if (!methodConstraint.enabled && borgMode == borgModes.whitelist)
             return false;
-        
+
 
         if(methodConstraint.enabled && methodConstraint.paramOffsets.length == 0 && borgMode == borgModes.blacklist)
-            return false; 
+            return false;
 
         // Iterate through the whitelist constraints for the method
         for (uint256 i = 0; i < methodConstraint.paramOffsets.length;) { 

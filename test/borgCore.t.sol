@@ -48,7 +48,7 @@ contract BorgCoreTest is Test {
     core = new borgCore(auth, 0x1, borgCore.borgModes.whitelist, 'borg-core-testing', address(safe));
 
     failSafe = new failSafeImplant(auth, address(safe), dao);
-    eject = new ejectImplant(auth, MULTISIG, address(failSafe), false, true);
+    eject = new ejectImplant(auth, MULTISIG, address(failSafe), false, true, true);
 
     deal(owner, 2 ether);
     deal(MULTISIG, 2 ether);

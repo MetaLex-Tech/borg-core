@@ -1,8 +1,11 @@
 cache/
 out/
-.env
+.env*
 test-command.txt
 broadcast/
 
 .DS_Store
+.idea/
 /broadcast_bk
+
+/tmp/

@@ -97,7 +97,7 @@ contract GrantBorgTest is Test {
     safe = IGnosisSafe(MULTISIG);
     core = new borgCore(auth, 0x1, borgCore.borgModes.whitelist, 'grant-bool-testing', address(safe));
     failSafe = new failSafeImplant(auth, address(safe), dao);
-    eject = new ejectImplant(auth, MULTISIG, address(failSafe), false, true);
+    eject = new ejectImplant(auth, MULTISIG, address(failSafe), false, true, true);
     opGrant = new optimisticGrantImplant(auth, MULTISIG, address(metaVesTController));
     //constructor(Auth _auth, address _borgSafe, uint256 _duration, uint _quorum, uint256 _threshold, uint _cooldown, address _governanceAdapter, address _governanceExecutor, address _metaVesT, address _metaVesTController)
     vetoGrant = new daoVetoGrantImplant(auth, MULTISIG, 600, 5, 10, 600, address(governanceAdapter), address(mockDao), address(metaVesTController));

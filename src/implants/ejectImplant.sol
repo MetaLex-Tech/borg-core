@@ -22,6 +22,7 @@ contract ejectImplant is BaseImplant {
     address public immutable FAIL_SAFE;
     bool public immutable ALLOW_AUTH_MANAGEMENT;
     bool public immutable ALLOW_AUTH_EJECT;
+    bool public immutable ALLOW_AUTH_SELF_EJECT_REDUCE;
     uint256 public failSafeSignerThreshold;
 
     // Errors and Events
@@ -40,12 +41,13 @@ contract ejectImplant is BaseImplant {
 
     /// @param _auth initialize authorization parameters for this contract, including applicable conditions
     /// @param _borgSafe address of the applicable BORG's Gnosis Safe which is adding this ejectImplant
-    constructor(BorgAuth _auth, address _borgSafe, address _failSafe, bool _allowManagement, bool _allowEjection) BaseImplant(_auth, _borgSafe) {
+    constructor(BorgAuth _auth, address _borgSafe, address _failSafe, bool _allowManagement, bool _allowEjection, bool _allowSelfEjectReduce) BaseImplant(_auth, _borgSafe) {
         if (IBaseImplant(_failSafe).IMPLANT_ID() != 0)
             revert ejectImplant_InvalidFailSafeImplant();
         FAIL_SAFE = _failSafe;
         ALLOW_AUTH_MANAGEMENT = _allowManagement;
         ALLOW_AUTH_EJECT = _allowEjection;
+        ALLOW_AUTH_SELF_EJECT_REDUCE = _allowSelfEjectReduce;
     }
 
     /// @notice setFailSafeSignerThreshold for the DAO or oversight BORG to set the maximum threshold for the fail safe to be triggered
@@ -193,6 +195,7 @@ contract ejectImplant is BaseImplant {
     /// @param _reduce boolean to reduce the threshold if the owner is the last to self-eject
     function selfEject(bool _reduce) public conditionCheck {
         if (!ISafe(BORG_SAFE).isOwner(msg.sender)) revert ejectImplant_NotOwner();
+        if(_reduce && !ALLOW_AUTH_SELF_EJECT_REDUCE) revert ejectImplant_ActionNotEnabled();
 
         address[] memory owners = ISafe(BORG_SAFE).getOwners();
          address prevOwner = address(0x1);
