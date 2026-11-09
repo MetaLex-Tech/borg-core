@@ -1,5 +1,6 @@
 cache/
 out/
+out.*/
 .env*
 test-command.txt
 broadcast/

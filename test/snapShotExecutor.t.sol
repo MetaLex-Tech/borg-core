@@ -375,4 +375,157 @@ contract SnapShotExecutorTest is Test {
         vm.prank(owner);
         snapShotExecutor.transferExpiredOracle(newOracle, newOracleTtl);
     }
+
+    /// @dev An attacker cannot grief a 1-slot proposal (common size for a proposal) by paying too little gas per INV-1 & INV-6 @ https://github.com/ethereum/glamsterdam-gas-invariants
+    function testGasGrief_SingleNewSlotProposalNotConsumed() public {
+        _assertNotGriefable(1);
+    }
+
+    /// @dev An attacker cannot grief a proposal of up to 32 new slots (a large borgCore policy batch) by paying too little gas per INV-1 & INV-6 @ https://github.com/ethereum/glamsterdam-gas-invariants
+    function testGasGrief_32NewSlotProposalNotConsumed() public {
+        _assertNotGriefable(32);
+    }
+
+    /// @dev An attacker cannot grief a large borgCore policy proposal (80 new slots, ~5 KB cdata) by paying too little gas per INV-1 & INV-6 @ https://github.com/ethereum/glamsterdam-gas-invariants
+    function testGasGrief_PolicyBatchProposalNotConsumed() public {
+        BorgAuth coreAuth = new BorgAuth();
+        borgCore core = new borgCore(coreAuth, 0x3, borgCore.borgModes.blacklist, "Yearn BORG", address(0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52));
+        coreAuth.updateRole(address(snapShotExecutor), coreAuth.OWNER_ROLE());
+
+        bytes memory cdata = _transferPolicyBatch(core);
+        emit log_named_uint("new slots", _countNewSlots(address(core), cdata));
+        _assertNotGriefable(_propose(address(core), cdata));
+    }
+
+    function _transferPolicyBatch(borgCore core) internal pure returns (bytes memory) {
+        address[5] memory tokens = [
+            0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2, // WETH
+            0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48, // USDC
+            0xdAC17F958D2ee523a2206206994597C13D831ec7, // USDT
+            0x6B175474E89094C44Da98b954EedeAC495271d0F, // DAI
+            0x0bc529c00C6401aEF6D220BE8C6Ea1667F6Ad93e  // YFI
+        ];
+        uint256 n = tokens.length * 2;
+        address[] memory contracts = new address[](n);
+        string[] memory methods = new string[](n);
+        borgCore.ParamType[] memory paramTypes = new borgCore.ParamType[](n);
+        uint256[] memory minValues = new uint256[](n);
+        uint256[] memory maxValues = new uint256[](n);
+        int256[] memory iminValues = new int256[](n);
+        int256[] memory imaxValues = new int256[](n);
+        bytes32[] memory exactMatches = new bytes32[](tokens.length * 3);
+        uint256[] memory matchNum = new uint256[](n);
+        uint256[] memory byteOffsets = new uint256[](n);
+        uint256[] memory byteLengths = new uint256[](n);
+
+        for (uint256 i = 0; i < tokens.length; i++) {
+            // Recipient: one of 3 approved addresses
+            contracts[2 * i] = tokens[i];
+            methods[2 * i] = "transfer(address,uint256)";
+            paramTypes[2 * i] = borgCore.ParamType.ADDRESS;
+            matchNum[2 * i] = 3;
+            byteOffsets[2 * i] = 4;
+            byteLengths[2 * i] = 32;
+            for (uint256 j = 0; j < 3; j++) {
+                exactMatches[3 * i + j] = keccak256(abi.encode(address(uint160(0x1000 + j))));
+            }
+            // Amount: maximum per transfer
+            contracts[2 * i + 1] = tokens[i];
+            methods[2 * i + 1] = "transfer(address,uint256)";
+            paramTypes[2 * i + 1] = borgCore.ParamType.UINT;
+            maxValues[2 * i + 1] = 1_000_000 ether;
+            byteOffsets[2 * i + 1] = 36;
+            byteLengths[2 * i + 1] = 32;
+        }
+
+        return abi.encodeWithSelector(core.updatePolicy.selector, contracts, methods, paramTypes, minValues, maxValues, iminValues, imaxValues, exactMatches, matchNum, byteOffsets, byteLengths);
+    }
+
+    /// @dev Count the storage slots of `target` that go from zero to non-zero when the executor calls it with `cdata`
+    function _countNewSlots(address target, bytes memory cdata) internal returns (uint256 count) {
+        uint256 snap = vm.snapshot();
+        vm.startStateDiffRecording();
+        vm.prank(address(snapShotExecutor));
+        (bool success,) = target.call(cdata);
+        Vm.AccountAccess[] memory accesses = vm.stopAndReturnStateDiff();
+        vm.revertTo(snap);
+        assertTrue(success, "Proposal call should succeed with enough gas");
+
+        bytes32[] memory seen = new bytes32[](1024);
+        for (uint256 i = 0; i < accesses.length; i++) {
+            for (uint256 j = 0; j < accesses[i].storageAccesses.length; j++) {
+                Vm.StorageAccess memory s = accesses[i].storageAccesses[j];
+                if (s.account != target || !s.isWrite || s.reverted || s.previousValue != 0 || s.newValue == 0) continue;
+                bool dup;
+                for (uint256 k = 0; k < count; k++) {
+                    if (seen[k] == s.slot) { dup = true; break; }
+                }
+                if (!dup) seen[count++] = s.slot;
+            }
+        }
+    }
+
+    function _assertNotGriefable(uint256 newSlots) internal {
+        SlotWriter writer = new SlotWriter();
+        _assertNotGriefable(_propose(address(writer), abi.encodeWithSelector(SlotWriter.write.selector, newSlots)));
+    }
+
+    function _assertNotGriefable(bytes32 proposalId) internal {
+        (uint256 minGas, bool callSucceeded) = _minCompletingGas(proposalId);
+        emit log_named_uint("min completing gas", minGas);
+        assertTrue(callSucceeded, "Proposal call failed but execute() deleted the proposal");
+    }
+
+    function _propose(address target, bytes memory cdata) internal returns (bytes32 proposalId) {
+        vm.prank(oracle);
+        proposalId = snapShotExecutor.propose(
+            target,
+            0,
+            cdata,
+            "Yearn BORG admin operation approved by the DAO through Snapshot vote, executed by ychad.eth"
+        );
+        skip(snapShotExecutor.waitingPeriod());
+    }
+
+    /// @dev Find the smallest gas limit for which execute() does not revert. Report if the proposal call succeeded at that limit.
+    function _minCompletingGas(bytes32 proposalId) internal returns (uint256 lo, bool callSucceeded) {
+        lo = 21_000;
+        uint256 hi = 16_000_000;
+        (bool completedAtHi,) = _tryExecute(proposalId, hi);
+        assertTrue(completedAtHi, "execute() should complete within the search range");
+        while (lo < hi) {
+            uint256 mid = (lo + hi) / 2;
+            (bool completed,) = _tryExecute(proposalId, mid);
+            if (completed) hi = mid;
+            else lo = mid + 1;
+        }
+        (, callSucceeded) = _tryExecute(proposalId, lo);
+    }
+
+    function _tryExecute(bytes32 proposalId, uint256 gasLimit) internal returns (bool completed, bool callSucceeded) {
+        uint256 snap = vm.snapshot();
+        vm.recordLogs();
+        vm.prank(owner);
+        try snapShotExecutor.execute{gas: gasLimit}(proposalId) {
+            completed = true;
+            Vm.Log[] memory logs = vm.getRecordedLogs();
+            for (uint256 i = 0; i < logs.length; i++) {
+                if (logs[i].topics[0] != ProposalExecuted.selector) continue;
+                (,,,, callSucceeded) = abi.decode(logs[i].data, (uint256, bytes, string, uint256, bool));
+            }
+        } catch {}
+        vm.revertTo(snap);
+    }
+}
+
+contract SlotWriter {
+    mapping(uint256 => uint256) public slots;
+    bool public done;
+
+    function write(uint256 n) external {
+        for (uint256 i = 0; i < n; i++) {
+            slots[i] = 1;
+        }
+        done = true;
+    }
 }
